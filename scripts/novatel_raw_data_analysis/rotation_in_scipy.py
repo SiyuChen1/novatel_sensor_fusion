@@ -51,7 +51,7 @@ Rx = R.from_euler('x', 45, degrees=True).as_matrix()
 Ry = R.from_euler('y', 30, degrees=True).as_matrix()
 Rz = R.from_euler('z', 60, degrees=True).as_matrix()
 
-# rotation order firstly x, then y, at last z, rotatimg
+# rotation order firstly x, then y, at last z, rotating axes
 R6 = R.from_euler('ZYX', [60, 30, 45], degrees=True).as_matrix()
 
 # rotation order firstly z, then y, at last x, fixed rotation axes
