@@ -13,7 +13,7 @@ q = np.array([w, x, y, z])
 
 print('norm of the quaternion', np.sum(np.square(q)))
 M = transforms3d.quaternions.quat2mat(q)
-# rotation order firstly z, then x, at last y
+# rotation order firstly z, then x, at last y, fixed rotating axes
 angles = np.array(transforms3d.euler.mat2euler(M, 'syxz'))
 print(transforms3d.axangles.mat2axangle(M))
 
