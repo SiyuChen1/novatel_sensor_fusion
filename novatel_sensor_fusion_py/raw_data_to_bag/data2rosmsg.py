@@ -1,13 +1,14 @@
 from geometry_msgs.msg import TransformStamped
 from gps_time import GPSTime
 from novatel_sensor_fusion.msg import NavSatStatusExtended
+from sensor_msgs.msg import Imu
 from std_msgs.msg import Header
 from tf2_msgs.msg import TFMessage
 import transforms3d
 
 
 def gps_time_to_ros_header(gps_week, seconds_in_week, frame_id):
-    current_gps_time = GPSTime(week_number=gps_week, time_of_week=seconds_in_week)
+    current_gps_time = GPSTime(week_number=int(gps_week), time_of_week=float(seconds_in_week))
     # convert gps time to python datetime and then to posix time
     current_posix_time = current_gps_time.to_datetime().timestamp()
     header = Header()
@@ -110,3 +111,24 @@ def data_to_tf_paras(header_, data_, paras):
     child_id = paras[1]
     translation = paras[2]
     return data_to_tf(header_, data_, translation, base_id, child_id)
+
+
+def data_to_imu(header_, data_, paras):
+    gps_week = header_[1]
+    seconds_after_week = header_[2]
+
+    IMU_DATA_RATE = paras[0]
+    frame_id = paras[1]
+
+    msg = Imu()
+    msg.header = gps_time_to_ros_header(gps_week, seconds_after_week, frame_id)
+    imu_data_count = int(data_[0])
+    if imu_data_count > 0:
+        msg.angular_velocity.x = IMU_DATA_RATE / imu_data_count * float(data_[1])
+        msg.angular_velocity.y = IMU_DATA_RATE / imu_data_count * float(data_[2])
+        msg.angular_velocity.z = IMU_DATA_RATE / imu_data_count * float(data_[3])
+        msg.linear_acceleration.x = IMU_DATA_RATE / imu_data_count * float(data_[4])
+        msg.linear_acceleration.y = IMU_DATA_RATE / imu_data_count * float(data_[5])
+        msg.linear_acceleration.z = IMU_DATA_RATE / imu_data_count * float(data_[6])
+        return msg
+    return None

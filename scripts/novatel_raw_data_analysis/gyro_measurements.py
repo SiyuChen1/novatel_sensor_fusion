@@ -124,9 +124,12 @@ for index in range(nb):
     if not np.isnan(q_list[index, 0]) and not np.isnan(q_estimated[index, 0]):
         # method 1: Norm of the Difference of Quaternions
         # https://www.cs.cmu.edu/~cga/dynopt/readings/Rmetric.pdf page 4, section 3.3
+        # and equation 31
         error_1 = np.sqrt(np.sum(np.square(q_list[index, :] - q_estimated[index, :])))
         error_2 = np.sqrt(np.sum(np.square(q_list[index, :] + q_estimated[index, :])))
         error = np.min([error_1, error_2])
+        # using equation 31
+        error = np.arccos(1 - error ** 2 / 2)
         q_error[index] = error * 180 / np.pi
 
         # # method 2: Inner Product of Unit Quaternions

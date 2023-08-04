@@ -1,4 +1,4 @@
-from novatel_sensor_fusion_py.filter_impl.ekf import Car, ExtendedKalmanFilter16States
+from novatel_sensor_fusion_py.filter_impl.ekf import ExtendedKalmanFilter16States
 import numpy as np
 import pytest
 
@@ -68,4 +68,4 @@ def test_ekf_16_states_imu_gyro_accel_noise(ekf_16_states_impl_1):
 
 
 def test_ekf_16_states_imu_gyro_accel_noise(ekf_16_states_impl_2):
-    print(ekf_16_states_impl_2.predict(accel, gyro, dt, trapezoidal_integration=True))
+    print(ekf_16_states_impl_2.compute_next_state(accel, gyro, dt, trapezoidal_integration=True))

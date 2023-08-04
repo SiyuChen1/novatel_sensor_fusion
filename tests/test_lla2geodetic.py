@@ -1,4 +1,4 @@
-from novatel_sensor_fusion_py.lla2geodetic.lla2geodetic import ecef2enu, lla2ecef, lla2enu
+from novatel_sensor_fusion_py.lla2geodetic.lla2geodetic import ecef2enu, enu2lla, lla2ecef, lla2enu, lla2ned
 import numpy as np
 
 
@@ -43,3 +43,32 @@ def test_lla2enu():
     enu = lla2enu(lat, lon, alt, lat_ref, lon_ref, alt_ref, degrees=True)
     enu_real = np.array([77.5843, 111.1496, -190.0000])
     assert np.allclose(enu, enu_real, 1e-1)
+
+
+def test_enu2lla():
+    lat_ref = 45.9132
+    lon_ref = 36.7484
+    alt_ref = 1877.7532
+
+    east = 77.5843
+    north = 111.1496
+    up = -190.0000
+
+    lla_real = np.array([45.9142, 36.7494, 1687.7532])
+    lla = enu2lla(east, north, up, lat_ref, lon_ref, alt_ref, degrees=True)
+    assert np.allclose(lla, lla_real)
+
+    enu = lla2enu(lla[0], lla[1], lla[2], lat_ref, lon_ref, alt_ref, degrees=True)
+    assert np.allclose(enu, np.array([east, north, up]))
+
+
+def test_lla2ned():
+    lat_ref = 45.9132
+    lon_ref = 36.7484
+    alt_ref = 1877.7532
+
+    lla = np.array([45.9142, 36.7494, 1687.7532])
+    ned_real = np.array([111.1496, 77.5843, 190.0000])
+
+    ned = lla2ned(lla[0], lla[1], lla[2], lat_ref, lon_ref, alt_ref, degrees=True)
+    assert np.allclose(ned, ned_real)

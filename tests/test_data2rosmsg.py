@@ -1,5 +1,5 @@
 from novatel_sensor_fusion_py.raw_data_to_bag.data2rosmsg import (
-    data_to_gnss_msg, data_to_tf, data_to_tf_paras, gps_time_to_ros_header,)
+    data_to_gnss_msg, data_to_tf, data_to_tf_paras, gps_time_to_ros_header, data_to_imu)
 import pytest
 
 
@@ -113,3 +113,22 @@ def test_data_to_tf_paras():
 
     assert msg.header.frame_id == base_id
     assert msg.child_frame_id == child_id
+
+
+def test_data_to_imu():
+    raw_data = '%CORRIMUSA,2269,129755.030;1,-0.0000731120567875,'\
+        '-0.0000083534662499,0.0000521803559345,-0.0007077320118335,'\
+        '0.0008881368174285,0.0001594393292871,7.090,0*b388322e'.split(';')
+    header_ = raw_data[0].split(',')
+    data_ = raw_data[1].split(',')
+    IMU_DATA_RATE = 100
+    frame_id = 'vehicle'
+    msg = data_to_imu(header_, data_, (IMU_DATA_RATE, frame_id))
+
+    assert msg.header.frame_id == frame_id
+    assert msg.angular_velocity.x == pytest.approx(-0.00731120567875)
+    assert msg.angular_velocity.y == pytest.approx(-0.00083534662499)
+    assert msg.angular_velocity.z == pytest.approx(0.00521803559345)
+    assert msg.linear_acceleration.x == pytest.approx(-0.07077320118335)
+    assert msg.linear_acceleration.y == pytest.approx(0.08881368174285)
+    assert msg.linear_acceleration.z == pytest.approx(0.01594393292871)

@@ -6,7 +6,8 @@
 # you will get an error when you try to start the node with
 import re
 
-from novatel_sensor_fusion_py.raw_data_to_bag.data2rosmsg import data_to_gnss_msg, data_to_tf_paras
+from novatel_sensor_fusion_py.raw_data_to_bag.data2rosmsg import data_to_gnss_msg, \
+    data_to_tf_paras, data_to_imu
 from rclpy.node import Node
 from rclpy.serialization import serialize_message
 from rclpy.time import Time
@@ -34,11 +35,12 @@ dz = 0.013
 translation_imu2ll = [dx, dy, dz]
 translation = [dx, -dy, -dz]
 topic_dict = {'BESTGNSSPOSA': ('bestgnsspos', 'novatel_sensor_fusion/msg/NavSatStatusExtended',
-                               data_to_gnss_msg, 'bestgnsspos'),
+                               data_to_gnss_msg, 'local_level_i'),
               'BESTPOSA': ('bestpos', 'novatel_sensor_fusion/msg/NavSatStatusExtended',
-                           data_to_gnss_msg, 'bestpos'),
+                           data_to_gnss_msg, 'local_level_i'),
               'INSATTQSA': ('tf', 'tf2_msgs/msg/TFMessage', data_to_tf_paras,
-                            ('local_level_i', 'vehicle', translation))}
+                            ('local_level_i', 'vehicle', translation)),
+              'CORRIMUSA': ('imu', 'sensor_msgs/msg/Imu', data_to_imu, (IMU_DATA_RATE, 'vehicle'))}
 
 
 class RawData2Bag(Node):
@@ -109,7 +111,7 @@ class RawData2Bag(Node):
 def main(args=None):
     data_path = '/home/siyuchen/Documents/' + \
         'Novatel_Stereocam_Daten_20230703/20230703_140222/IMUData_20230703_140222.log'
-    bag_name = 'navatel_sensor_data'
+    bag_name = 'novatel_sensor_data'
     RawData2Bag(data_path, bag_name)
 
 
