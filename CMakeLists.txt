@@ -20,6 +20,9 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/QuaternionStampedExtended.msg"
   "msg/NavSatStatusExtended.msg"
+  "msg/NavRMC.msg"
+  "msg/NavSat.msg"
+  "msg/NavSatExtended.msg"
   DEPENDENCIES builtin_interfaces geometry_msgs std_msgs
   ADD_LINTER_TESTS
  )
@@ -31,6 +34,7 @@ ament_python_install_package(novatel_sensor_fusion_py)
 install(PROGRAMS
   scripts/read_raw_data_to_bag.py
   scripts/tf_broadcaster_lla2neu.py
+  scripts/sub_gnss_imu.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

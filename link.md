@@ -1,5 +1,6 @@
 - [Create a ROS2 package for Both Python and Cpp Nodes](https://roboticsbackend.com/ros2-package-for-both-python-and-cpp-nodes/)
 - [CPT7 and CPT7700 Installation and Operation User Manual](https://docs.novatel.com/OEM7/Content/PDFs/CPT7_Installation_Operation_Manual.pdf)
+- [CPT7 and CPT7700 Commands and Logs](https://docs.novatel.com/OEM7/Content/PDFs/OEM7_Commands_Logs_Manual.pdf)
 - [The Continuous-Time Kalman Filter](https://webee.technion.ac.il/people/shimkin/Estimation09/ch5_cont.pdf)
 - [Quaternion kinematics for the error-state Kalman filter](https://www.iri.upc.edu/people/jsola/JoanSola/objectes/notes/kinematics.pdf)
 - [IMU and GPS Fusion for Inertial Navigation](https://de.mathworks.com/help/fusion/ug/imu-and-gps-fusion-for-inertial-navigation.html)

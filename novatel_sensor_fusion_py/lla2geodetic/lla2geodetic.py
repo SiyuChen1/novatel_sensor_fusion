@@ -43,8 +43,13 @@ def ecef2enu(lat_ref, lon_ref, alt_ref, xyz, degrees=False):
     return rotation @ xyz_dif
 
 
-def lla2enu(latitude, longitude, altitude, lat_ref, lon_ref,
-            alt_ref, radius=6378137, f=1/298.257223563, degrees=False):
+def lla2ecef2enu(latitude, longitude, altitude, lat_ref, lon_ref,
+                 alt_ref, radius=6378137, f=1/298.257223563, degrees=False):
+    """
+
+    This function converts lla to ecef and then to enu,
+    but the transformation is not accurate
+    """
     if degrees:
         latitude = latitude * np.pi / 180
         longitude = longitude * np.pi / 180
@@ -52,3 +57,53 @@ def lla2enu(latitude, longitude, altitude, lat_ref, lon_ref,
         lon_ref = lon_ref * np.pi / 180
     xyz = lla2ecef(latitude, longitude, altitude, radius=radius, f=f, degrees=False)
     return ecef2enu(lat_ref, lon_ref, alt_ref, xyz, degrees=False)
+
+
+def lla2ned(latitude, longitude, altitude, lat_ref, lon_ref,
+            alt_ref, radius=6378137, f=1/298.257223563, degrees=False):
+    if degrees:
+        latitude = latitude * np.pi / 180
+        longitude = longitude * np.pi / 180
+        lat_ref = lat_ref * np.pi / 180
+        lon_ref = lon_ref * np.pi / 180
+
+    dlat = latitude - lat_ref
+    dlon = longitude - lon_ref
+    e2 = f * (2 - f)
+    rn = radius / np.sqrt(1 - e2 * np.sin(lat_ref) * np.sin(lat_ref))
+    rm = rn * (1 - e2) / (1 - e2 * np.sin(lat_ref) * np.sin(lat_ref))
+    dnorth = dlat / np.arctan2(1, rm)
+    deast = dlon / np.arctan2(1, rn * np.cos(lat_ref))
+    ned = np.array([dnorth, deast, - altitude + alt_ref])
+    return ned
+
+
+def lla2enu(latitude, longitude, altitude, lat_ref, lon_ref,
+            alt_ref, radius=6378137, f=1/298.257223563, degrees=False):
+    if degrees:
+        latitude = latitude * np.pi / 180
+        longitude = longitude * np.pi / 180
+        lat_ref = lat_ref * np.pi / 180
+        lon_ref = lon_ref * np.pi / 180
+    ned = lla2ned(latitude, longitude, altitude, lat_ref, lon_ref, alt_ref,
+                  radius, f, degrees=False)
+    return np.array([[0, 1, 0], [1, 0, 0], [0, 0, -1]]) @ ned
+
+
+def enu2lla(east, north, up, lat_ref, lon_ref, alt_ref,
+            radius=6378137, f=1/298.257223563, degrees=False):
+    if degrees:
+        lat_ref = lat_ref * np.pi / 180
+        lon_ref = lon_ref * np.pi / 180
+    alt = up + alt_ref
+    e2 = f * (2 - f)
+    rn = radius / np.sqrt(1 - e2 * np.sin(lat_ref) * np.sin(lat_ref))
+    rm = rn * (1 - e2) / (1 - e2 * np.sin(lat_ref) * np.sin(lat_ref))
+
+    dlat = north * np.arctan2(1, rm)
+    dlon = east * np.arctan2(1, rn * np.cos(lat_ref))
+    lat = dlat + lat_ref
+    lon = dlon + lon_ref
+    lla = 180 / np.pi * np.array([lat, lon, 0])
+    lla[2] = alt
+    return lla
