@@ -1,3 +1,4 @@
+from builtin_interfaces.msg import Time
 from geometry_msgs.msg import TransformStamped
 from gps_time import GPSTime
 from novatel_sensor_fusion.msg import NavSatStatusExtended
@@ -7,14 +8,21 @@ from tf2_msgs.msg import TFMessage
 import transforms3d
 
 
-def gps_time_to_ros_header(gps_week, seconds_in_week, frame_id):
+def gps_time_to_ros_time(gps_week, seconds_in_week):
     current_gps_time = GPSTime(week_number=int(gps_week), time_of_week=float(seconds_in_week))
     # convert gps time to python datetime and then to posix time
     current_posix_time = current_gps_time.to_datetime().timestamp()
+    stamp = Time()
+    # https://docs.ros2.org/latest/api/builtin_interfaces/msg/Time.html
+    stamp.sec = int((current_posix_time // 1))
+    stamp.nanosec = int(1e9 * (current_posix_time % 1))
+    return stamp
+
+
+def gps_time_to_ros_header(gps_week, seconds_in_week, frame_id):
     header = Header()
     # https://docs.ros2.org/latest/api/builtin_interfaces/msg/Time.html
-    header.stamp.sec = int((current_posix_time // 1))
-    header.stamp.nanosec = int(1e9 * (current_posix_time % 1))
+    header.stamp = gps_time_to_ros_time(gps_week, seconds_in_week)
     header.frame_id = frame_id
     return header
 

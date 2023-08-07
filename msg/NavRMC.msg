@@ -11,4 +11,4 @@ float64 ground_speed
 float64 track_angle
 
 # Date: dd/mm/yy
-string data
+string date

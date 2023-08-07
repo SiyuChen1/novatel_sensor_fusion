@@ -11,7 +11,7 @@ const rclnodejs = require('rclnodejs');
 app.use(express.static('public'));
 
 // Start the server
-const port = 8888;
+const port = 8889;
 server.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
@@ -26,13 +26,13 @@ io.on('connection', (socket) => {
     // create a ros2 node
     const nodePos = new rclnodejs.Node('subscription_gnsspos_node');
 
-    nodePos.createSubscription('msg_definition/msg/NavSatStatusExtended', '/bestgnsspos', (msg) => {
+    nodePos.createSubscription('novatel_sensor_fusion/msg/NavSatExtended', '/bestgnss', (msg) => {
         //console.log(`Received bestgnsspos message: ${typeof msg}`, msg.latitude);
         //console.log(JSON.stringify(msg))
         socket.emit('bestgnsspos', msg.latitude, msg.longitude, msg.header.stamp);
     });
 
-    nodePos.createSubscription('msg_definition/msg/NavSatStatusExtended', '/bestpos', (msg) => {
+    nodePos.createSubscription('novatel_sensor_fusion/msg/NavSatExtended', '/best', (msg) => {
         // console.log(`Received bestpos message: ${typeof msg}`, msg.latitude);
         // console.log(JSON.stringify(msg))
         socket.emit('bestpos', msg.latitude, msg.longitude);

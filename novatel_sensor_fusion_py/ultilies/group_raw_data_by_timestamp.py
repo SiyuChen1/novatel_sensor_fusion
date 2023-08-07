@@ -31,7 +31,7 @@ def parse_line(row):
 
     # Extracting the command type
     # command_type = parts[0].split("#")[-1]
-    command_type = re.split('[#%]', parts[0])[-1]
+    command_type = re.split('[#%$]', parts[0])[-1]
 
     # # Removing the "A" at the end of the command type as instructed
     # command_type = command_type[:-1] if command_type.endswith("A") else command_type
@@ -50,8 +50,15 @@ def parse_line(row):
         utc_time_str = parts[1].split('.')
         utc_time_str_first = utc_time_str[0]
         utc_time_microsecs = float('0.' + utc_time_str[1]) * 1e6
+        date = parts[9]
+        # year = int('20' + date[4:6])
+        # month = int(date[2:4])
+        # day = int(date[0:2])
+        year = 2023
+        month = 7
+        day = 3
         utc_time = datetime(
-            2023, 7, 3, int(utc_time_str_first[0:2]), int(utc_time_str_first[2:4]), int(utc_time_str_first[4:6]),
+            year, month, day, int(utc_time_str_first[0:2]), int(utc_time_str_first[2:4]), int(utc_time_str_first[4:6]),
             int(utc_time_microsecs))
         gps_week, gps_seconds = utc_to_gps_week_seconds(utc_time)
         gps_time = str(gps_week) + ',' + '{:.3f}'.format(gps_seconds)

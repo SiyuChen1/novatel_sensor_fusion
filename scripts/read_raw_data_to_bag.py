@@ -26,9 +26,9 @@ IMU_DATA_RATE = 100
 # RBV: Rotation from the IMU body frame to the vehicle frame.
 
 # translation_imu2ll = [dx, dy, dz] is the translation from IMU frame to
-# instantaneous local level frame (ENU). Since after rotating 180 degree around 180 degrees
+# instantaneous local level frame (ENU), i.e. antenna1. Since after rotating 180 degree around 180 degrees
 # the IMU frame is transformed to the vehicle frame.
-# the translation from instantaneous local level frame (ENU) to vehicle frame is [dx, -dy, -dz]
+# the translation from vehicle frame to instantaneous local level frame (ENU) is [dx, -dy, -dz]
 dx = 0.431
 dy = 0.0
 dz = 0.013

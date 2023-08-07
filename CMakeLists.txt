@@ -35,6 +35,7 @@ install(PROGRAMS
   scripts/read_raw_data_to_bag.py
   scripts/tf_broadcaster_lla2neu.py
   scripts/sub_gnss_imu.py
+  scripts/read_raw_data_to_bag_group_by_timestamp.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
