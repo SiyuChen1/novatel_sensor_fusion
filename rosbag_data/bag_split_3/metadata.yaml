@@ -1,0 +1,70 @@
+rosbag2_bagfile_information:
+  version: 7
+  storage_identifier: mcap
+  duration:
+    nanoseconds: 186980000019
+  starting_time:
+    nanoseconds_since_epoch: 1688379747109999895
+  message_count: 41697
+  topics_with_message_count:
+    - topic_metadata:
+        name: /bestgnss
+        type: novatel_sensor_fusion/msg/NavSatExtended
+        serialization_format: cdr
+        offered_qos_profiles: ""
+        type_description_hash: ""
+      message_count: 1869
+    - topic_metadata:
+        name: /best
+        type: novatel_sensor_fusion/msg/NavSatExtended
+        serialization_format: cdr
+        offered_qos_profiles: ""
+        type_description_hash: ""
+      message_count: 1869
+    - topic_metadata:
+        name: /gpgga
+        type: novatel_sensor_fusion/msg/NavSat
+        serialization_format: cdr
+        offered_qos_profiles: ""
+        type_description_hash: ""
+      message_count: 187
+    - topic_metadata:
+        name: /gpggalong
+        type: novatel_sensor_fusion/msg/NavSat
+        serialization_format: cdr
+        offered_qos_profiles: ""
+        type_description_hash: ""
+      message_count: 187
+    - topic_metadata:
+        name: /gprmc
+        type: novatel_sensor_fusion/msg/NavRMC
+        serialization_format: cdr
+        offered_qos_profiles: ""
+        type_description_hash: ""
+      message_count: 187
+    - topic_metadata:
+        name: /imu
+        type: sensor_msgs/msg/Imu
+        serialization_format: cdr
+        offered_qos_profiles: ""
+        type_description_hash: ""
+      message_count: 18699
+    - topic_metadata:
+        name: /tf
+        type: tf2_msgs/msg/TFMessage
+        serialization_format: cdr
+        offered_qos_profiles: ""
+        type_description_hash: ""
+      message_count: 18699
+  compression_format: ""
+  compression_mode: ""
+  relative_file_paths:
+    - bag_split_3_0.mcap
+  files:
+    - path: bag_split_3_0.mcap
+      starting_time:
+        nanoseconds_since_epoch: 1688379747109999895
+      duration:
+        nanoseconds: 186980000019
+      message_count: 41697
+  custom_data: ~

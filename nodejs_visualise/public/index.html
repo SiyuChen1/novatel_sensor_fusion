@@ -4,10 +4,42 @@
   <title>Geodata Display</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
   <style>
+    /* Reset default margin and padding */
+    body, html {
+        margin: 0;
+        padding: 0;
+        height: 100%; /* Ensure body and html occupy the full height */
+    }
+
     #map {
       /* margin: 0px; */
-      height: 100vh;
-      width: 100vw;
+      height: 100%;
+      width: 100%;
+    }
+
+    /* Container for the two columns */
+    .container {
+      display: flex;
+      width: 100vw; /* Full viewport width */
+      height: 100vh; /* Full viewport height */
+    }
+
+    .column1 {
+      flex: 10; /* 10 parts of the available space */
+    }
+
+    /* Second column containing two divs */
+    .column2 {
+        flex: 3; /* Take up equal width as column1 */
+        display: flex;
+        flex-direction: column; /* Stack the divs vertically */
+    }
+
+    .column2 .box {
+        background-color: #e0e0e0; /* Gray background for visualization */
+        margin: 1px;
+        padding: 1px;
+        flex: 1; /* Distribute space equally among the two divs */
     }
 
     /*https://codepen.io/haakseth/pen/KQbjdO*/
@@ -49,9 +81,19 @@
   </style>
 </head>
 <body>
-  <div id="map"></div>
+<!--  <div id="map"></div>-->
+  <div class="container">
+    <div class="column1">
+      <div id="map"></div>
+    </div>
+    <div class="column2">
+      <div class="box" id="lla_plot"></div>
+      <div class="box" id="error_plot"></div>
+    </div>
+  </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.1/socket.io.js"></script>
   <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="display.js"></script>
 </body>
 </html>

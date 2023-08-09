@@ -1,4 +1,3 @@
-from novatel_sensor_fusion_py.lla2geodetic.lla2geodetic import lla2enu
 import numpy as np
 from scipy.spatial.transform import Rotation
 
@@ -247,7 +246,7 @@ class ExtendedKalmanFilter16States:
         q_repair = repair_quaternion(q)
 
         next_state[0:4] = q_repair
-        return next_state
+        self.set_state(next_state)
 
     def control_input_jacobian(self):
         qw = self.state[0]
@@ -294,20 +293,14 @@ class ExtendedKalmanFilter16States:
         return next_state_covariance
 
     def fuse_gps(self, gps_position, gps_velocity, gps_position_std, gps_velocity_std):
-        lat_ref = self.lla_ref[0]
-        lon_ref = self.lla_ref[1]
-        alt_ref = self.lla_ref[2]
-        lat = gps_position[0]
-        lon = gps_position[1]
-        alt = gps_position[2]
-
+        # gps position is given in ENU coordinate system
         measure_noise_w = np.zeros(6)
         measure_noise_w[0:3] = gps_position_std
         measure_noise_w[3:6] = gps_velocity_std
         measure_cov = np.diag(measure_noise_w)
 
-        pos = lla2enu(lat, lon, alt, lat_ref, lon_ref, alt_ref, degrees=True)
-        z = np.array([pos[0], pos[1], pos[2], gps_velocity[0], gps_velocity[1], gps_velocity[2]])
+        z = np.array([gps_position[0], gps_position[1], gps_position[2],
+                      gps_velocity[0], gps_velocity[1], gps_velocity[2]])
         h = self.measure_fun()
         dhdx = self.measure_jacobian_fun()
 
@@ -316,14 +309,15 @@ class ExtendedKalmanFilter16States:
         innov = z - h
 
         w = p @ np.transpose(dhdx) @ np.linalg.inv(innov_covariance)
-        state = self.set_state() + w @ innov
+        state = self.get_state() + w @ innov
         p = p - w @ dhdx @ p
 
         q = state[0:4]
         q = repair_quaternion(q)
         state[0:4] = q
 
-        return state, p
+        self.set_state(state)
+        self.set_state_covariance(p)
 
     def measure_fun(self):
         return self.state[4:10]

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 import numpy as np
-from novatel_sensor_fusion.msg import NavSatStatusExtended
+from novatel_sensor_fusion.msg import NavSatExtended
 from novatel_sensor_fusion_py.filter_impl import ExtendedKalmanFilter16States
-from novatel_sensor_fusion_py.lla2geodetic.lla2geodetic import lla2enu
+from novatel_sensor_fusion_py.lla2geodetic.lla2geodetic import enu2lla, lla2enu
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
@@ -13,20 +13,22 @@ from tf2_msgs.msg import TFMessage
 
 class GNSSIMUSubscriber(Node):
 
-    def __init__(self, imu_topic, imu_paras, gnss_topic):
+    def __init__(self, imu_topic, imu_paras, gnss_topic, best_topic):
         super().__init__('gnss_imu_subscriber')
 
         self.ekf = ExtendedKalmanFilter16States(
             imu_paras['imu_data_rate'], imu_paras['gyro_bias_instability'],
             imu_paras['accelerometer_bias_instability'],
             imu_paras['angular_random_walk'],
-            imu_paras['velocity_random_walk']
+            imu_paras['velocity_random_walk'],
+            init_state_covariance=1e-3 * np.eye(16),
+            other_additive_noise=1e-4
         )
 
         self.init_quaternion_msg = None
         self.init_state = np.zeros(16)
         self.current_time = None
-        self.is_ready = False
+        self.is_quaternion_init = False
         self.is_gnss_ready = False
         self.lla_ref = [50.77766817103, 6.07832598964, 178.5169]
 
@@ -37,42 +39,66 @@ class GNSSIMUSubscriber(Node):
             100)
         self.imu_subscription  # prevent unused variable warning
 
-        self.quaternion_subscription = self.create_subscription(
-            TFMessage,
-            '/tf',
-            self.quaternion_callback,
-            100
-        )
-        self.quaternion_subscription
-
         self.gnss_subscription = self.create_subscription(
-            NavSatStatusExtended,
+            NavSatExtended,
             gnss_topic,
             self.gnss_callback,
             100
         )
+        self.gnss_subscription
+
+        self.best_subscription = self.create_subscription(
+            NavSatExtended,
+            best_topic,
+            self.best_callback,
+            100
+        )
+        self.best_subscription
+
+        self.publisher = self.create_publisher(NavSatExtended, '/fused', 10)
+
+        self.get_logger().info('node is initialised')
 
     def gnss_callback(self, msg):
-        lat = msg.latitude
-        lon = msg.longitude
-        alt = msg.altitude
-        enu = lla2enu(lat, lon, alt, self.lla_ref[0], self.lla_ref[1], self.lla_ref[2])
-        if not self.is_gnss_ready:
-            self.init_state[4:7] = enu
-            self.current_time = Time(seconds=msg.header.stamp.sec,
-                                     nanoseconds=msg.header.stamp.nanosec)
-            self.is_gnss_ready = True
-        else:
+        if self.is_gnss_ready and self.is_quaternion_init:
             lat = msg.latitude
             lon = msg.longitude
             alt = msg.altitude
-            enu = lla2enu(lat, lon, alt, self.lla_ref[0], self.lla_ref[1], self.lla_ref[2])
-            self.ekf.fuse_gps()
-            # TODO
+            enu = lla2enu(lat, lon, alt, self.lla_ref[0], self.lla_ref[1], self.lla_ref[2], degrees=True)
+            v_h = msg.horizontal_speed
+            theta = msg.direction_to_north * np.pi / 180
+            v_north = v_h * np.cos(theta)
+            v_east = v_h * np.sin(theta)
+            v_up = msg.vertical_speed
+            cov_p = [msg.position_covariance[0],
+                     msg.position_covariance[4],
+                     msg.position_covariance[8]]
+            cov_v = 10 * np.array(cov_p)
+            self.ekf.fuse_gps(enu, [v_east, v_north, v_up], cov_p, cov_v)
+            state = self.ekf.get_state()
+            fused_msg = NavSatExtended()
+            fused_msg.header = msg.header
+            # print('enu:', enu)
+            # print(state[4:7])
+            lla = enu2lla(state[4], state[5], state[6],
+                          self.lla_ref[0], self.lla_ref[1], self.lla_ref[2], degrees=True)
+            fused_msg.latitude = lla[0]
+            fused_msg.longitude = lla[1]
+            fused_msg.altitude = lla[2]
+            self.publisher.publish(fused_msg)
 
     def imu_callback(self, msg):
         # self.get_logger().info('I heard Imu: "%s"' % msg.header.frame_id)
-        if self.is_ready:
+        if self.is_gnss_ready:
+            if not self.is_quaternion_init:
+                self.init_state[0] = msg.orientation.w
+                self.init_state[1] = msg.orientation.x
+                self.init_state[2] = msg.orientation.y
+                self.init_state[3] = msg.orientation.z
+                self.current_time = Time(seconds=msg.header.stamp.sec,
+                                         nanoseconds=msg.header.stamp.nanosec)
+                self.ekf.set_state(self.init_state)
+                self.is_quaternion_init = True
             accel = np.zeros(3)
             accel[0] = msg.linear_acceleration.x
             accel[1] = msg.linear_acceleration.y
@@ -86,9 +112,20 @@ class GNSSIMUSubscriber(Node):
             now = Time(seconds=msg.header.stamp.sec,
                        nanoseconds=msg.header.stamp.nanosec)
             dt = now - self.current_time
-            print(dt.nanoseconds / 1e9)
-            self.ekf.compute_next_state(accel, gyro, dt.nanoseconds / 1e9, True)
+            if dt.nanoseconds < 0:
+                print('fatal error')
+            self.ekf.imu_predict(accel, gyro, dt.nanoseconds / 1e9, True)
             self.current_time = now
+
+    def best_callback(self, msg):
+        if not self.is_gnss_ready:
+            lat = msg.latitude
+            lon = msg.longitude
+            alt = msg.altitude
+            enu = lla2enu(lat, lon, alt, self.lla_ref[0],
+                          self.lla_ref[1], self.lla_ref[2], degrees=True)
+            self.init_state[4:7] = enu
+            self.is_gnss_ready = True
 
     def quaternion_callback(self, msg):
         # self.get_logger().info('I heard Quaternion: "%s"' % msg.transforms[0].child_frame_id)
@@ -127,7 +164,7 @@ def main(args=None):
                  'velocity_random_walk': 0.06
                  }
 
-    subscriber = GNSSIMUSubscriber('/imu', imu_paras, '/bestgnsspos')
+    subscriber = GNSSIMUSubscriber('/imu', imu_paras, '/bestgnss', '/best')
 
     rclpy.spin(subscriber)
 
