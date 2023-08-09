@@ -1,6 +1,24 @@
 import numpy as np
 
 
+def wrap_longitude(lon):
+    if lon > 180:
+        term = lon % (2 * 180)
+        lon = term - 2 * 180 * np.fix(term / 180)
+    return lon
+
+
+def wrap_latitude(lat, lon):
+    flat = np.abs(lat)
+    if flat > 180:
+        lat = (lat + 180) % 360 - 180
+        flat = np.abs(lat)
+    if flat > 90:
+        flat = np.abs(lat)
+        lon = lon + 180
+        lat = np.sign(lat )
+
+
 def lla2ecef(latitude, longitude, altitude, radius=6378137, f=1/298.257223563, degrees=False):
     """
     Convert lla to ecef coordinate system.
@@ -106,4 +124,5 @@ def enu2lla(east, north, up, lat_ref, lon_ref, alt_ref,
     lon = dlon + lon_ref
     lla = 180 / np.pi * np.array([lat, lon, 0])
     lla[2] = alt
+    lla[1] = wrap_longitude(lla[1])
     return lla

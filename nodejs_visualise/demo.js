@@ -35,7 +35,13 @@ io.on('connection', (socket) => {
     nodePos.createSubscription('novatel_sensor_fusion/msg/NavSatExtended', '/best', (msg) => {
         // console.log(`Received bestpos message: ${typeof msg}`, msg.latitude);
         // console.log(JSON.stringify(msg))
-        socket.emit('bestpos', msg.latitude, msg.longitude);
+        socket.emit('bestpos', msg.latitude, msg.longitude, msg.header.stamp);
+    });
+
+    nodePos.createSubscription('novatel_sensor_fusion/msg/NavSatExtended', '/fused', (msg) => {
+        // console.log(`Received bestpos message: ${typeof msg}`, msg.latitude);
+        // console.log(JSON.stringify(msg))
+        socket.emit('fusedpos', msg.latitude, msg.longitude, msg.header.stamp);
     });
 
     nodePos.spin();
@@ -48,7 +54,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
         console.log('Client disconnected');
         rclnodejs.shutdownAll();
-        console.log("ROS2 Node shutted down")
+        console.log("ROS2 Node shut down")
   });
 });
 

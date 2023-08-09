@@ -46,7 +46,7 @@ def plot_bestgnsspos_bestpos(abs_path, file_name):
 def search_specific_gps_time(gps_time_array, time_of_week):
     for index in range(len(gps_time_array) - 1):
         if gps_time_array[index].time_of_week <= time_of_week and \
-            gps_time_array[index + 1].time_of_week >= time_of_week:
+                gps_time_array[index + 1].time_of_week >= time_of_week:
             return index
 
 

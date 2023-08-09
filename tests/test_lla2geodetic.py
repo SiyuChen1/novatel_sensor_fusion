@@ -72,3 +72,17 @@ def test_lla2ned():
 
     ned = lla2ned(lla[0], lla[1], lla[2], lat_ref, lon_ref, alt_ref, degrees=True)
     assert np.allclose(ned, ned_real)
+
+    lla_l = np.array([
+        # first lla
+        [45.9142, 36.7494, 1687.7532],
+        # second lla
+        [45.9132, 36.7464, 1687.7522]]
+    )
+
+    # output shape = (3, nb of lla values)
+    ned_l = lla2ned(
+        lla_l[:, 0], lla_l[:, 1], lla_l[:, 2],
+        lat_ref, lon_ref, alt_ref, degrees=True)
+    ned_l_real = np.array([[111.1496, 77.5843, 190.0000], [0, -155.1687, 190.001]]).T
+    assert np.allclose(ned_l, ned_l_real)

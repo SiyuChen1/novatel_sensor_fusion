@@ -1,0 +1,5 @@
+DARK_RED = '#c1272d'
+INDIGO = '#0000a7'
+YELLOW = '#eecc16'
+TEAL = '#008176'
+LIGHT_GRAY = '#b3b3b3'

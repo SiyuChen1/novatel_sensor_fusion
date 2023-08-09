@@ -55,6 +55,10 @@ class ImuRawDataBagRecorder(Node):
         self.grouped_data_df = list(parsed_data_df.groupby('gps_time'))
 
     def write_data_to_bag(self):
+        only_best = 0
+        only_bestvel = 0
+        only_bestgnss = 0
+        only_bestgnssvel = 0
         for indx in range(len(self.grouped_data_df)):
             data = self.grouped_data_df[indx]
             gps_time_str = data[0].split(',')
@@ -96,6 +100,7 @@ class ImuRawDataBagRecorder(Node):
                     data = raw_data
                 data = data.split(',')
                 command_type = row['command_type']
+
                 match command_type:
                     case 'CORRIMUSA':
                         imu_data_count = int(data[0])
@@ -151,13 +156,11 @@ class ImuRawDataBagRecorder(Node):
                         lon_str = data[5]
                         gprmc_msg.latitude = dms_to_decimal(
                             degrees=int(lat_str[0:2]),
-                            minutes=int(lat_str[2:4]),
-                            seconds=float(lat_str[5:-1])
+                            minutes=float(lat_str[2:-1])
                         )
                         gprmc_msg.longitude = dms_to_decimal(
                             degrees=int(lon_str[0:3]),
-                            minutes=int(lon_str[3:5]),
-                            seconds=float(lon_str[6:-1])
+                            minutes=float(lon_str[3:-1])
                         )
                         if data[2] == 'A':
                             gprmc_msg.is_pos_valid = True
@@ -182,14 +185,12 @@ class ImuRawDataBagRecorder(Node):
 
                         msg.latitude = dms_to_decimal(
                             degrees=int(lat_str[0:2]),
-                            minutes=int(lat_str[2:4]),
-                            seconds=float(lat_str[5:-1])
+                            minutes=float(lat_str[2:-1])
                         )
 
                         msg.longitude = dms_to_decimal(
                             degrees=int(lon_str[0:3]),
-                            minutes=int(lon_str[3:5]),
-                            seconds=float(lon_str[6:-1])
+                            minutes=float(lon_str[3:-1])
                         )
 
                         msg.altitude = float(data[9])
@@ -247,20 +248,33 @@ class ImuRawDataBagRecorder(Node):
                         bestgnsspos.direction_to_north = float(data[5])
                         bestgnsspos.vertical_speed = float(data[6])
 
-            if 'BESTPOSA' in command_types or 'BESTVELA' in command_types:
+            if 'BESTPOSA' in command_types and 'BESTVELA' in command_types:
                 self.writer.write(
                     '/best', serialize_message(bestpos),
                     Time.from_msg(stamp).nanoseconds)
+            elif 'BESTPOSA' in command_types:
+                only_best += 1
+            elif 'BESTVELA' in command_types:
+                only_bestvel += 1
 
-            if 'BESTGNSSPOSA' in command_types or 'BESTGNSSVELA' in command_types:
+            if 'BESTGNSSPOSA' in command_types and 'BESTGNSSVELA' in command_types:
                 self.writer.write(
                     '/bestgnss', serialize_message(bestgnsspos),
                     Time.from_msg(stamp).nanoseconds)
+            elif 'BESTGNSSPOSA' in command_types:
+                only_bestgnss += 1
+            elif 'BESTGNSSVELA' in command_types:
+                only_bestgnssvel += 1
 
             if 'CORRIMUSA' in command_types or 'INSATTQSA' in command_types:
                 self.writer.write(
                     '/imu', serialize_message(imu_msg),
                     Time.from_msg(stamp).nanoseconds)
+
+        print(f'In msg, {only_bestgnss} only has bestgnsspos')
+        print(f'In msg, {only_bestgnssvel} only has bestgnssposvel')
+        print(f'In msg, {only_best} only has bestpos')
+        print(f'In msg, {only_bestvel} only has bestvel')
 
 
 def main(args=None):

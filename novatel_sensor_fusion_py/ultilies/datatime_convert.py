@@ -30,17 +30,17 @@ def utc_to_gps_week_seconds(utc_time):
     return gps_week, gps_seconds
 
 
-def dms_to_decimal(degrees, minutes, seconds):
+def dms_to_decimal(degrees, minutes):
     """
     Convert degrees, minutes, and seconds to decimal degrees.
+    See this link
+    https://stackoverflow.com/questions/18442158/latitude-longitude-in-wrong-format-dddmm-mmmm-2832-3396n
 
     Parameters:
     - degrees (int): The number of degrees.
-    - minutes (int): The number of minutes.
-    - seconds (float): The number of seconds.
+    - minutes (float): The number of minutes.
 
     Returns:
     - float: The decimal representation of the degrees, minutes, and seconds.
     """
-    return degrees + minutes / 60.0 + seconds / 3600.0
-
+    return degrees + minutes / 60.0
