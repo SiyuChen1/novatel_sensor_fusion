@@ -36,11 +36,18 @@
     }
 
     .column2 .box {
-        background-color: #e0e0e0; /* Gray background for visualization */
+        /*background-color: #e0e0e0; !* Gray background for visualization *!*/
         margin: 1px;
         padding: 1px;
         flex: 1; /* Distribute space equally among the two divs */
     }
+
+    canvas {
+    width: 100% !important;
+    max-width: 800px;
+    height: auto !important;
+}
+
 
     /*https://codepen.io/haakseth/pen/KQbjdO*/
     /*Legend specific*/
@@ -78,22 +85,35 @@
       background-size: 18px;
       background-color: rgba(255, 255, 255, 1);
     }
+
+    .my-custom-button {
+      background-color: #f4f4f4;
+      border: 1px solid #999;
+      color: #333;
+      cursor: pointer;
+      padding: 6px 10px;
+      text-align: center;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
 <!--  <div id="map"></div>-->
   <div class="container">
     <div class="column1">
-      <div id="map"></div>
+      <div id="map">
+        <button id="toggleButton">Toggle Fullscreen</button>
+      </div>
     </div>
-    <div class="column2">
-      <div class="box" id="lla_plot"></div>
+    <div class="column2" id="plot">
+      <canvas id="lla_plot"></canvas>
       <div class="box" id="error_plot"></div>
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.1/socket.io.js"></script>
   <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="display.js"></script>
 </body>
 </html>
