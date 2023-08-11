@@ -1,15 +1,134 @@
 function convert_ros_timestamp_to_float(ros_ts){
-    var t = parseInt(ros_ts.sec + String(ros_ts.nanosec).substring(0, 3))
-    // console.log('ros timestamp nanosec', ros_ts.nanosec);
-    // console.log(String(ros_ts.nanosec).substring(0, 3))
-    // console.log('ros timestamp sec', ros_ts.sec);
-    // console.log('t', t);
+    var seconds = parseInt(ros_ts.nanosec) / 1e9;
+    var t = parseInt(ros_ts.sec) + seconds
     return t;
 }
-document.addEventListener('DOMContentLoaded', () => {
 
+function addData(chart, xValue, yValue, index) {
+    chart.data.datasets[index].data.push({x: xValue, y: yValue});
+    chart.update({
+        mode: 'none'
+    });
+}
+
+let windowStart = 0;
+
+function updateXAxis(chart) {
+    windowStart += 10;  // Move the window by 10 seconds
+    chart.options.scales.x.min = windowStart;
+    chart.options.scales.x.max = windowStart + 10;
+    chart.update({
+        mode: 'none'
+    });
+}
+
+L.Control.CustomButton = L.Control.extend({
+    options: {
+        position: 'topright'
+    },
+
+    onAdd: function(map) {
+        var button = L.DomUtil.create('button', 'my-custom-button');
+        button.innerHTML = 'Toggle Fullscreen';
+
+        L.DomEvent.on(button, 'click', function() {
+            var plotDiv = document.getElementById('plot');
+            if (plotDiv.style.display === 'none') {
+                plotDiv.style.display = 'block';
+                button.innerHTML = 'Toggle Fullscreen';
+                // console.log('none status');
+                map.invalidateSize();
+            } else {
+                plotDiv.style.display = 'none';
+                // console.log('block status');
+                button.innerHTML = 'Display Plot';
+                map.invalidateSize();
+            }
+        });
+
+        return button;
+    }
+});
+
+L.control.customButton = function(opts) {
+    return new L.Control.CustomButton(opts);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
     // Connect to the server via Socket.IO
     const socket = io();
+
+    var latitude_plot = {
+        datasets: [{
+            label: '/bestpos',
+            data: [],
+            borderColor: 'rgba(75, 192, 192, 1)',
+            fill: false
+        },
+        {
+            label: '/bestgnsspos',
+            data: [],
+            borderColor: 'rgba(255, 99, 132, 1)',
+            fill: false
+        }]
+    };
+
+    var options = {
+        plugins: {
+            title: {
+                display: true,
+                text: 'Latitude'
+            },
+            legend: {
+                display: true,  // Show or hide the legend.
+                position: 'bottom',  // Position of the legend. Can be 'top', 'left', 'bottom', 'right'.
+                align: 'center',  // Alignment. Can be 'start', 'center', 'end'.
+                labels: {
+                    boxWidth: 20,  // Width of legend color box.
+                    padding: 10,  // Padding between legend items.
+                    color: '#000',  // Font color.
+                    font: {
+                        size: 14  // Font size.
+                    }
+                }
+            }
+        },
+        scales: {
+            x: {
+                type: 'linear',
+                position: 'bottom',
+                beginAtZero: false,
+                title: {
+                    display: true,
+                    text: 'Time (s)' // x-axis label
+                }
+            },
+            y: {
+                beginAtZero: false,
+                title: {
+                    display: true,
+                    text: 'Value' // y-axis label
+                }
+            }
+        },
+        maintainAspectRatio: true
+};
+
+    // Initialize chart data and settings
+    var ctx = document.getElementById('lla_plot').getContext('2d');
+    var myLineChart = new Chart(ctx, {
+        type: 'line',
+        data: latitude_plot,
+        options: options,
+        responsive: true
+    });
+
+    // // Move the x-axis window every 10 seconds
+    // setInterval(function() {
+    //     updateXAxis(myLineChart);
+    // }, 10500);
+
+
     var start;
     var is_start_init = false;
     var nb_cycle = 100;
@@ -25,6 +144,8 @@ document.addEventListener('DOMContentLoaded', () => {
         maxZoom: 19
     }).addTo(map);
 
+    L.control.customButton().addTo(map);
+
     // https://www.simplifiedsciencepublishing.com/resources/best-color-palettes-for-scientific-figures-and-data-visualizations
     // https://rgbacolorpicker.com/hex-to-rgba
     // dark red: rgba(193, 39, 45, 0.4), light_red: rgba(193, 39, 45, 0.2), green: rgba(0, 129, 118, 1)
@@ -36,28 +157,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // https://codepen.io/haakseth/pen/KQbjdO
     /*Legend specific*/
     var legend = L.control({ position: "bottomleft" });
-
-    var initialData = [{
-        x: [1, 2, 3, 4],
-        y: [5, 6, 7, 8],
-        mode: 'lines'
-    }];
-
-    var layout = {
-        title: 'Real-time Data from rclnodejs',
-        xaxis: {
-            title: 'Time'
-        },
-        yaxis: {
-            title: 'Value'
-        }
-    };
-
-    // TESTER = document.getElementById('error_plot');
-	// Plotly.newPlot( TESTER, [initialData], layout);
-
-    // LLAPLOT = document.getElementById('lla_plot');
-	// Plotly.newPlot(LLAPLOT, initialData, layout);
 
     legend.onAdd = function(map) {
         var div = L.DomUtil.create("div", "legend");
@@ -81,6 +180,11 @@ document.addEventListener('DOMContentLoaded', () => {
             is_start_init = true;
             start = convert_ros_timestamp_to_float(stamp);
         }
+
+        var now = convert_ros_timestamp_to_float(stamp);
+        var duration = now - start;
+        addData(myLineChart, duration, latitude, 1);
+
         if (cur_id < nb_cycle){
             cur_polyline.addLatLng([latitude, longitude]);
             cur_id = cur_id + 1;
@@ -115,22 +219,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ref_polyline.addLatLng([latitude, longitude]);
 
         var now = convert_ros_timestamp_to_float(stamp);
-        // console.log(now)
-        // console.log(typeof now)
-        // console.log(start)
-        // console.log(typeof start)
-        // console.log('duration', now - start)
-        var duration = (now - start) / 1e3;
-
-        // initialData.at(0).x.push(duration);
-        // // console.log(stamp)
-        // // console.log(typeof stamp)
-        // // console.log(start)
-        // initialData.at(0).y.push(longitude);
-        // console.log('x', initialData.x)
-        // console.log('y', initialData.y)
-        // Plotly.react(LLAPLOT, initialData);
-
+        var duration = now - start;
+        addData(myLineChart, duration, latitude, 0);
     });
 
     // Listen for geodata updates from the server

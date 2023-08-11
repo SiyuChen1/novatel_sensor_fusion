@@ -246,6 +246,8 @@ class ExtendedKalmanFilter16States:
         q_repair = repair_quaternion(q)
 
         next_state[0:4] = q_repair
+
+        next_state[10:16] = self.state[10:16]
         self.set_state(next_state)
 
     def control_input_jacobian(self):

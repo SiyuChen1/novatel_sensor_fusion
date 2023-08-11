@@ -10,10 +10,12 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
+find_package(message_filters REQUIRED)
 
 find_package(builtin_interfaces REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 find_package(rosidl_default_generators REQUIRED)
 
@@ -43,13 +45,39 @@ install(PROGRAMS
 add_executable(listener src/subscriber_member_function.cpp)
 ament_target_dependencies(listener rclcpp std_msgs)
 
+add_executable(gnss_filter src/filter_gnss_message.cpp)
+
+# start: illustration of using msg defined in this project
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} rosidl_typesupport_cpp)
+target_link_libraries(gnss_filter ${cpp_typesupport_target})
+# end
+
+ament_target_dependencies(gnss_filter rclcpp std_msgs message_filters)
+
+add_executable(demo_message_filter_pub src/demo_message_filter_pub.cpp)
+ament_target_dependencies(demo_message_filter_pub rclcpp std_msgs)
+
+add_executable(demo_message_filter src/demo_message_filter.cpp)
+ament_target_dependencies(demo_message_filter rclcpp message_filters std_msgs)
+
 add_executable(talker src/publisher_member_function.cpp)
 ament_target_dependencies(talker rclcpp std_msgs)
 
+add_executable(demo_temp src/demo_temp.cpp)
+ament_target_dependencies(demo_temp rclcpp sensor_msgs message_filters)
+
+add_executable(demo_old src/demo_message_filter_older.cpp)
+ament_target_dependencies(demo_old rclcpp sensor_msgs message_filters)
+
 install(TARGETS
-  talker
-  listener
-  DESTINATION lib/${PROJECT_NAME})
+        talker
+        listener
+        demo_message_filter
+        demo_message_filter_pub
+        demo_temp
+        demo_old
+        gnss_filter
+        DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
