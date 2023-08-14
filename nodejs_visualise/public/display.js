@@ -233,4 +233,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // console.log(latitude, longitude)
         fused_polyline.addLatLng([latitude, longitude]);
     });
+
+    socket.on('diff_best_bestgnss', (msg)=>{
+        console.log(msg.header.frame_id)
+        console.log(msg.vector.x)
+    })
 });
