@@ -1,0 +1,10 @@
+<launch>
+    <node pkg="novatel_sensor_fusion" exec="gnss_messages_sync" name="gnss_message_sync" namespace="sync">
+        <param name="best_topic_name" value="/best"/>
+        <param name="bestgnss_topic_name" value="/bestgnss"/>
+        <param name="difference_best_bestgnss" value="/diff_best_bestgnss"/>
+        <param name="difference_best_fused" value="/diff_best_fused"/>
+        <param name="epsilon_sec" value="0" />
+        <param name="epsilon_nanosec" value="1000" />
+     </node>
+</launch>

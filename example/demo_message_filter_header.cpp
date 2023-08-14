@@ -11,7 +11,6 @@
 #include "message_filters/subscriber.h"
 #include "message_filters/sync_policies/approximate_epsilon_time.h"
 #include "message_filters/sync_policies/approximate_time.h"
-#include "std_msgs/msg/string.hpp"
 #include "std_msgs/msg/header.hpp"
 
 using namespace std::chrono_literals;
@@ -22,7 +21,7 @@ using namespace std::chrono_literals;
 class DemoMessageFilter : public rclcpp::Node
 {
 public:
-    DemoMessageFilter(const uint32_t& queue_size, const rclcpp::Duration& epsilon)
+    DemoMessageFilter(const uint32_t& queue_size)
             : Node("demo_message_filter")
     {
         rclcpp::QoS qos(10);
@@ -32,9 +31,9 @@ public:
         sub_2.subscribe(this, "/topic_2", rmw_qos_profile);
 
          // Uncomment this to verify that the messages indeed reach the
-         sub_1.registerCallback(
+        sub_1.registerCallback(
              std::bind(&DemoMessageFilter::Tmp1Callback, this, std::placeholders::_1));
-         sub_2.registerCallback(
+        sub_2.registerCallback(
              std::bind(&DemoMessageFilter::Tmp2Callback, this, std::placeholders::_1));
 
         sync_ = std::make_shared<Sync>(MySyncPolicy{queue_size}, sub_1, sub_2);
@@ -73,8 +72,7 @@ int main(int argc, char * argv[])
 {
     rclcpp::init(argc, argv);
     uint32_t queue_size = 10;
-    rclcpp::Duration s(1, 1000);
-    rclcpp::spin(std::make_shared<DemoMessageFilter>(queue_size, s));
+    rclcpp::spin(std::make_shared<DemoMessageFilter>(queue_size));
     rclcpp::shutdown();
     return 0;
 }
