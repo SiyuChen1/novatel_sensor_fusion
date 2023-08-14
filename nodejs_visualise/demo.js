@@ -44,6 +44,11 @@ io.on('connection', (socket) => {
         socket.emit('fusedpos', msg.latitude, msg.longitude, msg.header.stamp);
     });
 
+    nodePos.createSubscription('geometry_msgs/msg/Vector3Stamped', '/diff_best_bestgnss', (msg) =>{
+        console.log(typeof msg)
+        socket.emit('diff_best_bestgnss', msg)
+    });
+
     nodePos.spin();
   }).
   catch((e) => {
