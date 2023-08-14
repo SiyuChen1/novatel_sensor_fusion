@@ -5,7 +5,6 @@
 #include <memory>
 
 #include <message_filters/subscriber.h>
-#include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_epsilon_time.h>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/temperature.hpp>
