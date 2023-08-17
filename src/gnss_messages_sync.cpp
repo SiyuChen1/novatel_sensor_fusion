@@ -52,6 +52,7 @@ public:
 
         if (this->get_parameter("difference_best_bestgnss").get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET){
             diff_best_bestgnss_value = this->get_parameter("difference_best_bestgnss").as_string();
+            RCLCPP_INFO(this->get_logger(), "%s", diff_best_bestgnss_value.c_str());
             this->set_parameter(rclcpp::Parameter("difference_best_bestgnss", diff_best_bestgnss_value));
         }
 
@@ -87,9 +88,6 @@ private:
     void callback(const GNSSMsg::ConstSharedPtr& msg1,
                   const GNSSMsg::ConstSharedPtr& msg2)
     {
-//        RCLCPP_INFO(this->get_logger(), "Synchronized messages in sec: %d, %d", msg1->header.stamp.sec, msg2->header.stamp.sec);
-//        RCLCPP_INFO(this->get_logger(), "Synchronized messages in nanosec: %d, %d", msg1->header.stamp.nanosec, msg2->header.stamp.nanosec);
-//        pub1_->publish(*msg1);
         if(this->lla_ref_ready){
             double north1, north2, east1, east2, up1, up2;
             lla2enu(msg1->latitude, msg1->longitude, msg1->altitude,
@@ -98,12 +96,15 @@ private:
             lla2enu(msg2->latitude, msg2->longitude, msg2->altitude,
                     this->lla.lat, this->lla.lon, this->lla.alt,
                     east2, north2, up2,true);
+//            RCLCPP_INFO(this->get_logger(), "Synchronized messages in sec: %d, %d", msg1->header.stamp.sec, msg2->header.stamp.sec);
+//            RCLCPP_INFO(this->get_logger(), "in nanosec: %d, %d", msg1->header.stamp.nanosec, msg2->header.stamp.nanosec);
             auto msg = geometry_msgs::msg::Vector3Stamped();
             msg.header = msg2->header;
             msg.vector.x = east2 - east1;
             msg.vector.y = north2 - north1;
             msg.vector.z = up2 - up1;
             pub1_->publish(msg);
+//            RCLCPP_INFO(this->get_logger(), "%d, %d", msg.header.stamp.sec, msg.header.stamp.nanosec);
         }
     };
 
