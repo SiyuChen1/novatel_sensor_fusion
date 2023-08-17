@@ -1,0 +1,11 @@
+version: '3'
+services:
+  novatel_sensor_fusion:
+    image: osrf/ros:iron-desktop
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    volumes:
+      - ~/ros2_example_ws/src/novatel_sensor_fusion:/home/ros2_ws/src
+    stdin_open: true
+    tty: true
