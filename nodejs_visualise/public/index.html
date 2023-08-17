@@ -96,24 +96,52 @@
       box-shadow: 0 1px 5px rgba(0,0,0,0.65);
       font-size: 14px;
     }
+
+    .label-control {
+      background-color: rgba(255, 255, 255, 0.5);
+      /*padding: 6px 8px;*/
+      border-radius: 4px;
+      text-align: center;
+      font-size: 16px;  /* Set the desired font size here */
+    }
+
+    .label-control h4{
+      margin: 2px 12px 8px;
+      font-size: 16px;  /* Set the desired font size here */
+      color: #777;
+    }
+
+    .label-control i{
+      font-size: 12px;  /* Set the desired font size here */
+      color: #333333;
+    }
+
   </style>
 </head>
 <body>
 <!--  <div id="map"></div>-->
-  <div class="container">
+<div class="container">
     <div class="column1">
       <div id="map">
         <button id="toggleButton">Toggle Fullscreen</button>
       </div>
     </div>
     <div class="column2" id="plot">
+      <canvas id="east_plot"></canvas>
+      <canvas id="north_plot"></canvas>
+      <canvas id="up_plot"></canvas>
       <canvas id="lla_plot"></canvas>
-      <div class="box" id="error_plot"></div>
+      <p>
+        The formula for RMS is: \( \text{RMS} = \sqrt{\frac{1}{n} \sum_{i=1}^{n} \Delta p_i^2} \)
+      </p>
     </div>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.1/socket.io.js"></script>
   <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="text/javascript" async
+          src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-MML-AM_CHTML">
+  </script>
   <script src="display.js"></script>
 </body>
 </html>

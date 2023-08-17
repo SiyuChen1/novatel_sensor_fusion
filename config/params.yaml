@@ -1,0 +1,9 @@
+/sync:
+  gnss_message_sync:
+    ros__parameters:
+      best_topic_name: /best
+      bestgnss_topic_name: /bestgnss
+      difference_best_bestgnss: /diff_best_bestgnss_test
+      difference_best_fused: /diff_best_fused
+      epsilon_sec: 0
+      epsilon_nanosec: 1000

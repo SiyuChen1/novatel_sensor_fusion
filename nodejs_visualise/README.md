@@ -1,10 +1,11 @@
 # `nodejs_visualise` package
 If a new defined ros message is used in the nodejs, please uninstall `rclnodejs` and reinstall it again in order to generate interface message used for nodejs.
 ```bash
+source ~/catkin_ws/install/setup.bash
 npm uninstall rclnodejs
 npm install rclnodejs
 ```
-
+## Example of dynamically modified data using `plotly`
 ```html
 <head>
 	<!-- Load plotly.js into the DOM -->
