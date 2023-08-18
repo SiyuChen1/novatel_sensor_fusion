@@ -5,11 +5,9 @@ const express = require('express');
 const app = express();
 const server = require('http').createServer(app);
 const io = require('socket.io')(server);
+const fs = require('fs')
+const yaml = require('js-yaml')
 const rclnodejs = require('rclnodejs');
-
-const ParameterType = rclnodejs.ParameterType;
-const Parameter = rclnodejs.Parameter;
-const ParameterDescriptor = rclnodejs.ParameterDescriptor;
 
 // Serve static files from the "public" directory
 app.use(express.static('public'));
@@ -27,10 +25,13 @@ io.on('connection', (socket) => {
   rclnodejs.init().then(() => {
     // create a ros2 node
     const nodeVis = new rclnodejs.Node('visualisation', 'nodejs');
-
+    const paramNameRequest = {
+      names: ['best_topic_name', 'bestgnss_topic_name', 'difference_best_bestgnss', 'difference_best_fused']
+    };
     const topicsInfo = nodeVis.getTopicNamesAndTypes();
 
-    const GetParametersType = 'rcl_interfaces/srv/GetParameters';
+    /* Method 1: get topic name via ros2 service */
+/*  const GetParametersType = 'rcl_interfaces/srv/GetParameters';
     const client = nodeVis.createClient(GetParametersType,
         '/sync/gnss_message_sync/get_parameters');
 
@@ -48,8 +49,6 @@ io.on('connection', (socket) => {
             const foundObject = topicsInfo.find(item => item.name === topicName);
             if (foundObject){
                 nodeVis.createSubscription(foundObject.types[0], topicName, (msg) => {
-                    //console.log(`Received bestgnsspos message: ${typeof msg}`, msg.latitude);
-                    //console.log(JSON.stringify(msg))
                     socket.emit(paramNameRequest.names[i], msg);
                 });
             }
@@ -57,36 +56,28 @@ io.on('connection', (socket) => {
                 console.log(`${paramNameRequest.names[i]} not published`);
             }
         }
-    });
-    // console.log(topicsInfo)
+    });*/
 
-      // parameterClient.get('sync.gnss_message_sync.best_topic_name').then((result) => {
-    //   console.log(`Parameter value: ${result}`);
-    //   rclnodejs.shutdown();
-    // });
-
-    // nodePos.createSubscription('novatel_sensor_fusion/msg/NavSatExtended', '/bestgnss', (msg) => {
-    //     //console.log(`Received bestgnsspos message: ${typeof msg}`, msg.latitude);
-    //     //console.log(JSON.stringify(msg))
-    //     socket.emit('bestgnsspos', msg.latitude, msg.longitude, msg.header.stamp);
-    // });
-    //
-    // nodePos.createSubscription('novatel_sensor_fusion/msg/NavSatExtended', '/best', (msg) => {
-    //     // console.log(`Received bestpos message: ${typeof msg}`, msg.latitude);
-    //     // console.log(JSON.stringify(msg))
-    //     socket.emit('bestpos', msg.latitude, msg.longitude, msg.header.stamp);
-    // });
-    //
-    // nodePos.createSubscription('novatel_sensor_fusion/msg/NavSatExtended', '/fused', (msg) => {
-    //     // console.log(`Received bestpos message: ${typeof msg}`, msg.latitude);
-    //     // console.log(JSON.stringify(msg))
-    //     socket.emit('fusedpos', msg.latitude, msg.longitude, msg.header.stamp);
-    // });
-    //
-    // nodePos.createSubscription('geometry_msgs/msg/Vector3Stamped', '/diff_best_bestgnss', (msg) =>{
-    //     // console.log(typeof msg)
-    //     socket.emit('diff_best_bestgnss', msg)
-    // });
+      /* Method 2: get topic name from reading config file */
+      const configPath = '../config/params.yaml';
+      try {
+          const fileContents = fs.readFileSync(configPath, 'utf8');
+          const data = yaml.load(fileContents);
+          paramNameRequest.names.forEach((key) => {
+              const topicName = data['/sync']['gnss_message_sync']['ros__parameters'][key];
+              const foundObject = topicsInfo.find(item => item.name === topicName);
+              if (foundObject){
+                  nodeVis.createSubscription(foundObject.types[0], topicName, (msg) => {
+                      socket.emit(key, msg);
+                  });
+              }
+              else{
+                  console.log(`${topicName} not published`);
+              }
+          });
+      } catch (e) {
+          console.error('Error reading or parsing the YAML file:', e);
+      }
 
     nodeVis.spin();
   }).
