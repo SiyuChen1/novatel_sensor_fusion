@@ -24,6 +24,7 @@ class GNSSIMUSubscriber(Node):
             init_state_covariance=1e-3 * np.eye(16),
             other_additive_noise=1e-4
         )
+        self.get_logger().info('hello')
 
         self.init_quaternion_msg = None
         self.init_state = np.zeros(16)
@@ -91,6 +92,7 @@ class GNSSIMUSubscriber(Node):
         # self.get_logger().info('I heard Imu: "%s"' % msg.header.frame_id)
         if self.is_gnss_ready:
             if not self.is_quaternion_init:
+                self.get_logger().info('quaternion is initialised')
                 self.init_state[0] = msg.orientation.w
                 self.init_state[1] = msg.orientation.x
                 self.init_state[2] = msg.orientation.y
@@ -112,9 +114,12 @@ class GNSSIMUSubscriber(Node):
             now = Time(seconds=msg.header.stamp.sec,
                        nanoseconds=msg.header.stamp.nanosec)
             dt = now - self.current_time
+            # self.get_logger().info(f"elapsed time: {dt.nanoseconds / 1e9}")
             if dt.nanoseconds < 0:
-                print('fatal error')
+                self.get_logger().info('fatal error')
             self.ekf.imu_predict(accel, gyro, dt.nanoseconds / 1e9, True)
+            state = self.ekf.get_state()
+            self.get_logger().info(f'predicted (%0.8f, %0.8f, %0.8f)' % (state[4], state[5], state[6]))
             self.current_time = now
 
     def best_callback(self, msg):
@@ -124,19 +129,27 @@ class GNSSIMUSubscriber(Node):
             alt = msg.altitude
             enu = lla2enu(lat, lon, alt, self.lla_ref[0],
                           self.lla_ref[1], self.lla_ref[2], degrees=True)
+
+            lla = enu2lla(enu[0], enu[1], enu[2],
+                          self.lla_ref[0], self.lla_ref[1], self.lla_ref[2], degrees=True)
+
+            self.get_logger().info(f'(%0.8f, %0.8f, %0.8f)' % (lla[0], lla[1], lla[2]))
+            self.get_logger().info(f'(%0.8f, %0.8f, %0.8f)' % (lat, lon, alt))
+            self.get_logger().info(f'(%0.8f, %0.8f, %0.8f)' % (enu[0], enu[1], enu[2]))
+
             self.init_state[4:7] = enu
             self.is_gnss_ready = True
 
-    def quaternion_callback(self, msg):
-        # self.get_logger().info('I heard Quaternion: "%s"' % msg.transforms[0].child_frame_id)
-        if self.is_gnss_ready and not self.is_ready:
-            init_quaternion_msg = msg.transforms[0]
-            self.init_state[0] = init_quaternion_msg.transform.rotation.w
-            self.init_state[1] = init_quaternion_msg.transform.rotation.x
-            self.init_state[2] = init_quaternion_msg.transform.rotation.y
-            self.init_state[3] = init_quaternion_msg.transform.rotation.z
-            self.ekf.set_state(self.init_state)
-            self.is_ready = True
+    # def quaternion_callback(self, msg):
+    #     # self.get_logger().info('I heard Quaternion: "%s"' % msg.transforms[0].child_frame_id)
+    #     if self.is_gnss_ready and not self.is_quaternion_init:
+    #         init_quaternion_msg = msg.transforms[0]
+    #         self.init_state[0] = init_quaternion_msg.transform.rotation.w
+    #         self.init_state[1] = init_quaternion_msg.transform.rotation.x
+    #         self.init_state[2] = init_quaternion_msg.transform.rotation.y
+    #         self.init_state[3] = init_quaternion_msg.transform.rotation.z
+    #         self.ekf.set_state(self.init_state)
+    #         self.is_quaternion_init = True
 
 
 def main(args=None):

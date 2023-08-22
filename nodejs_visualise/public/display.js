@@ -264,32 +264,6 @@ function updateXAxis(chart) {
     }
 }
 
-function modifyPolylineStyle(map, polyline, decorator) {
-    if (map.hasLayer(polyline)) {
-        map.removeLayer(polyline)
-        // console.log("The polyline is on the map.");
-    } else {
-        // console.log("The polyline is not on the map.");
-    }
-
-    if (map.hasLayer(decorator)) {
-        map.removeLayer(decorator);
-        // console.log("The decorator is on the map.");
-    } else {
-        // console.log("The decorator is not on the map.");
-    }
-
-    polyline = L.polyline(polyline.getLatLngs(), polyline.options).addTo(map);
-    // console.log(polyline.getLatLngs())
-    decorator = L.polylineDecorator(polyline, {
-            patterns: [
-                {offset: '0%', endOffset: '50%', repeat: 0, symbol: L.Symbol.dash({pathOptions: {color: 'red', weight: polyline_width}})},
-                {offset: '50%', endOffset: '100%', repeat: 0, symbol: L.Symbol.dash({pathOptions: {color: 'blue', weight: polyline_width}})}
-            ]
-        }).addTo(map);
-    return [polyline, decorator]
-}
-
 L.Control.CustomButton = L.Control.extend({
     options: {
         position: 'topright'
@@ -391,13 +365,6 @@ document.addEventListener('DOMContentLoaded', () => {
             label_rms.update(rms.toFixed(3), accumulated_nb);
             // console.log('nb', accumulated_nb)
         }
-        [ref_polyline, ref_decorator] = modifyPolylineStyle(map, ref_polyline, ref_decorator);
-        // map.removeLayer(ref_polyline);
-        // if (decorator){
-        //     map.removeLayer(decorator)
-        // }
-        // map.addLayer(ref_polyline);
-        //
     }, update_time_interval * 1000);
 
 
@@ -545,6 +512,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Listen for geodata updates from the server
     socket.on('difference_best_fused', (msg) => {
+        const stamp = msg.header.stamp;
+        if (!is_start_init){
+            is_start_init = true;
+            start = convert_ros_timestamp_to_float(stamp);
+        }
+
+        // // console.log(latitude, longitude)
+        // fused_polyline.addLatLng([msg.latitude, msg.longitude]);
+        if (display_plot){
+            const now = convert_ros_timestamp_to_float(stamp);
+            const duration = now - start;
+            addData(north_chart, duration, Math.abs(msg.vector.y), 1);
+            addData(east_chart, duration, Math.abs(msg.vector.x), 1)
+            addData(up_chart, duration, Math.abs(msg.vector.z), 1)
+        }
+    });
+
+    socket.on('imu_ekf_fused_topic_name', (msg) => {
         const stamp = msg.header.stamp;
         if (!is_start_init){
             is_start_init = true;
