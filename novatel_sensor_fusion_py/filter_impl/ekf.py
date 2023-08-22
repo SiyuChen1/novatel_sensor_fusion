@@ -183,7 +183,7 @@ class ExtendedKalmanFilter16States:
         dfdx[15, 15] = 1
         return dfdx
 
-    def compute_next_state(self, accel, gyro, dt, trapezoidal_integration=True):
+    def imu_predict(self, accel, gyro, dt, trapezoidal_integration=True):
         qw = self.state[0]
         qx = self.state[1]
         qy = self.state[2]

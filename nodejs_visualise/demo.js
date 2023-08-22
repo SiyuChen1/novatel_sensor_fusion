@@ -26,7 +26,8 @@ io.on('connection', (socket) => {
     // create a ros2 node
     const nodeVis = new rclnodejs.Node('visualisation', 'nodejs');
     const paramNameRequest = {
-      names: ['best_topic_name', 'bestgnss_topic_name', 'difference_best_bestgnss', 'difference_best_fused']
+      names: ['best_topic_name', 'bestgnss_topic_name', 'imu_ekf_fused_topic_name',
+          'difference_best_bestgnss', 'difference_best_fused']
     };
     const topicsInfo = nodeVis.getTopicNamesAndTypes();
 
@@ -64,7 +65,7 @@ io.on('connection', (socket) => {
           const fileContents = fs.readFileSync(configPath, 'utf8');
           const data = yaml.load(fileContents);
           paramNameRequest.names.forEach((key) => {
-              const topicName = data['/sync']['gnss_message_sync']['ros__parameters'][key];
+              const topicName = data['/**']['ros__parameters'][key];
               const foundObject = topicsInfo.find(item => item.name === topicName);
               if (foundObject){
                   nodeVis.createSubscription(foundObject.types[0], topicName, (msg) => {
@@ -72,7 +73,7 @@ io.on('connection', (socket) => {
                   });
               }
               else{
-                  console.log(`${topicName} not published`);
+                  console.log(`Topic ${topicName} not published`);
               }
           });
       } catch (e) {

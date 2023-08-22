@@ -28,6 +28,7 @@ public:
     {
         std::string bestgnss_topic_name_value = "/bestgnss";
         std::string best_topic_name_value = "/best";
+        std::string imu_ekf_fused_topic_name_value = "/fused";
         std::string diff_best_bestgnss_value = "/diff_best_bestgnss";
         std::string diff_best_fused_value = "/diff_best_fused";
         int32_t sec = 0;
@@ -35,6 +36,7 @@ public:
 
         this->declare_parameter<std::string>("best_topic_name", best_topic_name_value);
         this->declare_parameter<std::string>("bestgnss_topic_name", bestgnss_topic_name_value);
+        this->declare_parameter<std::string>("imu_ekf_fused_topic_name", imu_ekf_fused_topic_name_value);
         this->declare_parameter<std::string>("difference_best_bestgnss", diff_best_bestgnss_value);
         this->declare_parameter<std::string>("difference_best_fused", diff_best_fused_value);
         this->declare_parameter<int32_t>("epsilon_sec", sec);
@@ -50,9 +52,15 @@ public:
             this->set_parameter(rclcpp::Parameter("bestgnss_topic_name", bestgnss_topic_name_value));
         }
 
+        if (this->get_parameter("imu_ekf_fused_topic_name").get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET){
+            imu_ekf_fused_topic_name_value = this->get_parameter("imu_ekf_fused_topic_name").as_string();
+//            RCLCPP_INFO(this->get_logger(), imu_ekf_fused_topic_name_value.c_str());
+            this->set_parameter(rclcpp::Parameter("imu_ekf_fused_topic_name", imu_ekf_fused_topic_name_value));
+        }
+
         if (this->get_parameter("difference_best_bestgnss").get_type() != rclcpp::ParameterType::PARAMETER_NOT_SET){
             diff_best_bestgnss_value = this->get_parameter("difference_best_bestgnss").as_string();
-            RCLCPP_INFO(this->get_logger(), "%s", diff_best_bestgnss_value.c_str());
+//            RCLCPP_INFO(this->get_logger(), "%s", diff_best_bestgnss_value.c_str());
             this->set_parameter(rclcpp::Parameter("difference_best_bestgnss", diff_best_bestgnss_value));
         }
 
@@ -73,19 +81,22 @@ public:
 
         sub1_.subscribe(this, best_topic_name_value);
         sub2_.subscribe(this, bestgnss_topic_name_value);
+        sub3_.subscribe(this, imu_ekf_fused_topic_name_value);
 
         sub1_.registerCallback(std::bind(&GNSSMessageFilterNode::lla_ref_callback, this, std::placeholders::_1));
 
         rclcpp::Duration epsilon(sec, nanosec);
-        sync_ = std::make_shared<Sync>(MySyncPolicy{queue_size, epsilon}, sub1_, sub2_);
-        sync_->registerCallback(&GNSSMessageFilterNode::callback, this);
+        sync1_ = std::make_shared<Sync>(MySyncPolicy{queue_size, epsilon}, sub1_, sub2_);
+        sync1_->registerCallback(&GNSSMessageFilterNode::best_bestgnss_callback, this);
+        sync2_ = std::make_shared<Sync>(MySyncPolicy{queue_size, epsilon}, sub1_, sub3_);
+        sync2_->registerCallback(&GNSSMessageFilterNode::best_fused_callback, this);
 
         pub1_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>(diff_best_bestgnss_value, 10);
-//        pub2_ = this->create_publisher<GNSSMsg>(diff_best_fused_value, 10);
+        pub2_ = this->create_publisher<geometry_msgs::msg::Vector3Stamped>(diff_best_fused_value, 10);
     };
 
 private:
-    void callback(const GNSSMsg::ConstSharedPtr& msg1,
+    void best_bestgnss_callback(const GNSSMsg::ConstSharedPtr& msg1,
                   const GNSSMsg::ConstSharedPtr& msg2)
     {
         if(this->lla_ref_ready){
@@ -104,7 +115,28 @@ private:
             msg.vector.y = north2 - north1;
             msg.vector.z = up2 - up1;
             pub1_->publish(msg);
-//            RCLCPP_INFO(this->get_logger(), "%d, %d", msg.header.stamp.sec, msg.header.stamp.nanosec);
+        }
+    };
+
+    void best_fused_callback(const GNSSMsg::ConstSharedPtr& msg1,
+                                const GNSSMsg::ConstSharedPtr& msg2)
+    {
+        if(this->lla_ref_ready){
+            double north1, north2, east1, east2, up1, up2;
+            lla2enu(msg1->latitude, msg1->longitude, msg1->altitude,
+                    this->lla.lat, this->lla.lon, this->lla.alt,
+                    east1, north1, up1,true);
+            lla2enu(msg2->latitude, msg2->longitude, msg2->altitude,
+                    this->lla.lat, this->lla.lon, this->lla.alt,
+                    east2, north2, up2,true);
+            auto msg = geometry_msgs::msg::Vector3Stamped();
+            msg.header = msg2->header;
+            msg.vector.x = east2 - east1;
+            msg.vector.y = north2 - north1;
+            msg.vector.z = up2 - up1;
+            pub2_->publish(msg);
+
+//            RCLCPP_INFO(this->get_logger(), "message %0.8f, %0.8f, %0.8f", msg.vector.x, msg.vector.y, msg.vector.z);
         }
     };
 
@@ -119,8 +151,8 @@ private:
         }
     };
 
-    GNSSSubscriber sub1_, sub2_;
-    std::shared_ptr<Sync> sync_;
+    GNSSSubscriber sub1_, sub2_, sub3_;
+    std::shared_ptr<Sync> sync1_,sync2_;
     rclcpp::Publisher<geometry_msgs::msg::Vector3Stamped>::SharedPtr pub1_, pub2_;
     bool lla_ref_ready;
     LLA lla;
