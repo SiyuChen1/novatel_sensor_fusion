@@ -3,11 +3,11 @@
 <!--    https://docs.ros.org/en/iron/How-To-Guides/Launch-files-migration-guide.html-->
 <!--    https://design.ros2.org/articles/roslaunch_xml.html#include-tag-->
 
-<!--    <arg name="bag_path" default="/home/siyuchen/catkin_ws/src/novatel_sensor_fusion/rosbag_data/bag_split_1/bag_split_1_0.mcap" description="ros2 bag file which contains raw data" />-->
-    <arg name="bag_path" default="/home/siyuchen/catkin_ws/imu_raw_data_bag_recorder/imu_raw_data_bag_recorder_0.mcap"
+<!--    <arg name="bag_path" default="/home/siyuchen/catkin_ws/src/novatel_sensor_fusion/rosbag_data/bag_split_2/bag_split_2_0.mcap" description="ros2 bag file which contains raw data" />-->
+    <arg name="bag_path" default="/home/siyuchen/catkin_ws/20230907_Laurensberg/20230907_Laurensberg_0.mcap"
          description="ros2 bag file which contains raw data" />
 
-    <arg name="nodejs_path" default="/home/siyuchen/catkin_ws/src/novatel_sensor_fusion/nodejs_visualise/demo.js"
+    <arg name="nodejs_path" default="/home/siyuchen/catkin_ws/src/novatel_sensor_fusion/nodejs_visualise"
          description="nodejs file for visualising" />
 
     <!-- Define the current working path using the PWD environment variable -->
@@ -38,4 +38,5 @@
     </node>
 
     <executable cmd="ros2 bag play $(var bag_path)" output="screen" />
+    <executable cmd="sh $(var pkg_path)/share/novatel_sensor_fusion/launch/run_nodejs_vis.sh" output="screen" />
 </launch>

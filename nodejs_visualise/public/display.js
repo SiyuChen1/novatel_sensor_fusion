@@ -1,7 +1,11 @@
 let windowStart = 0;
 let update_time_interval = 5;
+let accumulated_error_without_z = 0.0;
 let accumulated_error = 0.0;
 let accumulated_nb = 0;
+let fused_accumulated_error_without_z = 0.0;
+let fused_accumulated_error = 0.0;
+let fused_accumulated_nb = 0;
 let display_plot = true;
 let is_start_init = false;
 let display_ground_truth = true;
@@ -9,11 +13,15 @@ let display_raw_gnss = true;
 let display_fused = true;
 const polyline_width = 4;
 
+const fused_diff = [];
+const raw_diff = [];
+
 // https://www.simplifiedsciencepublishing.com/resources/best-color-palettes-for-scientific-figures-and-data-visualizations
 // https://rgbacolorpicker.com/hex-to-rgba
 // dark red: rgba(193, 39, 45, 0.4), light_red: rgba(193, 39, 45, 0.2), green: rgba(0, 129, 118, 1)
 const dark_red = '#c1272d66', light_red = '#c1272d33', green = '#008176';
-const coral = '#FF7F5077', teal = '#008080', goldenrod = '#DAA52099';
+const coral = '#FF7F5077', teal = '#008080', orange = '#FFAA00',
+    goldenrod = '#DAA52099', orange_red = '#FC4E2A';
 
 let options = {
     plugins: {
@@ -264,6 +272,23 @@ function updateXAxis(chart) {
     }
 }
 
+function arrayToCSV(data) {
+    return data.map(row => row.join(',')).join('\n');
+}
+
+function saveAsCSV(array2D, fileName) {
+    const csvContent = arrayToCSV(array2D);
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", url);
+    downloadAnchorNode.setAttribute("download", `${fileName}.csv`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+}
+
+
 L.Control.CustomButton = L.Control.extend({
     options: {
         position: 'topright'
@@ -274,17 +299,21 @@ L.Control.CustomButton = L.Control.extend({
         button.innerHTML = 'Toggle Fullscreen';
 
         L.DomEvent.on(button, 'click', function() {
-            var plotDiv = document.getElementById('plot');
+            let plotDiv = document.getElementById('plot');
             if (plotDiv.style.display === 'none') {
                 plotDiv.style.display = 'block';
                 button.innerHTML = 'Toggle Fullscreen';
                 map.invalidateSize();
                 display_plot = true;
             } else {
+                // if trigger fullscreen
                 plotDiv.style.display = 'none';
                 button.innerHTML = 'Display Plot';
                 map.invalidateSize();
                 display_plot = false;
+
+                saveAsCSV(fused_diff, 'fused_diff');
+                saveAsCSV(raw_diff, 'raw_diff')
             }
         });
 
@@ -305,10 +334,34 @@ L.Control.Label = L.Control.extend({
     },
 
     // Update the label's content
-    update: function(rms_value, nb) {
-        this._div.innerHTML = '<h4>Statistical</h4>';
-        this._div.innerHTML += `<i>RMS Value = ${rms_value} m</i><br>`;
-        this._div.innerHTML += `<i>Count of received values = ${nb}</i><br>`;
+    update: function(rms_value, nb, rms_value_without_z, fused_rms_value, fused_nb, fused_rms_value_without_z) {
+        // // previous display via label
+        // this._div.innerHTML = '<h4>Statistical</h4>';
+        // this._div.innerHTML += `<i>RMS Value = ${rms_value} m</i><br>`;
+        // this._div.innerHTML += `<i>Count of received values = ${nb}</i><br>`;
+        this._div.innerHTML = `<table class="tg"> <thead>
+            <tr>
+                <th class="tg-baqh" colspan="2">Type</th>
+                <th class="tg-baqh">RMS /m</th>
+                <th class="tg-baqh">Count</th>
+                <th class="tg-baqh">RMS Without Up</th>
+            </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="tg-baqh" colspan="2">Raw</td>
+            <td class="tg-baqh">${rms_value}</td>
+            <td class="tg-baqh">${nb}</td>
+            <td class="tg-baqh">${rms_value_without_z}</td>
+          </tr>
+          <tr>
+            <td class="tg-baqh" colspan="2">Fused</td>
+            <td class="tg-baqh">${fused_rms_value}</td>
+            <td class="tg-baqh">${fused_nb}</td>
+            <td class="tg-baqh">${fused_rms_value_without_z}</td>
+          </tr>
+        </tbody>
+        </table>`;
     }
 });
 
@@ -361,8 +414,12 @@ document.addEventListener('DOMContentLoaded', () => {
             updateXAxis(north_chart);
             updateXAxis(east_chart);
             updateXAxis(up_chart);
-            let rms = Math.sqrt(accumulated_error / accumulated_nb);
-            label_rms.update(rms.toFixed(3), accumulated_nb);
+            // let rms = Math.sqrt(accumulated_error / accumulated_nb);
+            // let fused_rms = Math.sqrt(fused_accumulated_error / fused_accumulated_nb);
+            // let rms_without_z = Math.sqrt(accumulated_error_without_z / accumulated_nb);
+            // let fused_rms_without_z = Math.sqrt(fused_accumulated_error_without_z / fused_accumulated_nb);
+            // label_rms.update(rms.toFixed(3), accumulated_nb, rms_without_z.toFixed(3),
+            //     fused_rms.toFixed(3), fused_accumulated_nb, fused_rms_without_z.toFixed(3));
             // console.log('nb', accumulated_nb)
         }
     }, update_time_interval * 1000);
@@ -386,9 +443,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     L.control.customButton().addTo(map);
 
-    cur_polyline = L.polyline([], {color: coral, weight: polyline_width}).addTo(map);
+    cur_polyline = L.polyline([], {color: orange, weight: polyline_width}).addTo(map);
     ref_polyline = L.polyline([], {color: teal, weight: polyline_width}).addTo(map);
-    fused_polyline = L.polyline([], {color: goldenrod, weight: polyline_width}).addTo(map);
+    fused_polyline = L.polyline([], {color: orange_red, weight: polyline_width}).addTo(map);
 
     // https://codepen.io/haakseth/pen/KQbjdO
     /*Legend specific*/
@@ -451,8 +508,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     legend.addTo(map);
 
-    let label_rms = new L.Control.Label({ position: 'bottomright' });
-    label_rms.addTo(map);
+    // let label_rms = new L.Control.Label({ position: 'bottomright' });
+    // label_rms.addTo(map);
 
     let cur_mark = L.marker([ref_lat, ref_lon]).addTo(map);
     cur_mark.bindPopup('Reference location')
@@ -518,15 +575,25 @@ document.addEventListener('DOMContentLoaded', () => {
             start = convert_ros_timestamp_to_float(stamp);
         }
 
-        // // console.log(latitude, longitude)
-        // fused_polyline.addLatLng([msg.latitude, msg.longitude]);
+        const now = convert_ros_timestamp_to_float(stamp);
+        const duration = now - start;
+
         if (display_plot){
-            const now = convert_ros_timestamp_to_float(stamp);
-            const duration = now - start;
             addData(north_chart, duration, Math.abs(msg.vector.y), 1);
-            addData(east_chart, duration, Math.abs(msg.vector.x), 1)
-            addData(up_chart, duration, Math.abs(msg.vector.z), 1)
+            addData(east_chart, duration, Math.abs(msg.vector.x), 1);
+            addData(up_chart, duration, Math.abs(msg.vector.z), 1);
         }
+
+        fused_diff.push([duration, msg.vector.x, msg.vector.y, msg.vector.z]);
+
+        fused_accumulated_error_without_z = fused_accumulated_error_without_z +
+            msg.vector.x * msg.vector.x +
+            msg.vector.y * msg.vector.y;
+        fused_accumulated_error = fused_accumulated_error_without_z +
+            msg.vector.z * msg.vector.z;
+        fused_accumulated_nb += 1;
+
+        console.log('difference_best_fused', fused_accumulated_nb, fused_accumulated_error_without_z, fused_accumulated_error)
     });
 
     socket.on('imu_ekf_fused_topic_name', (msg) => {
@@ -547,18 +614,26 @@ document.addEventListener('DOMContentLoaded', () => {
             start = convert_ros_timestamp_to_float(stamp);
         }
 
+        const now = convert_ros_timestamp_to_float(stamp);
+        const duration = now - start;
+
         if (display_plot){
-            const now = convert_ros_timestamp_to_float(stamp);
-            const duration = now - start;
             addData(north_chart, duration, Math.abs(msg.vector.y), 0);
-            addData(east_chart, duration, Math.abs(msg.vector.x), 0)
-            addData(up_chart, duration, Math.abs(msg.vector.z), 0)
+            addData(east_chart, duration, Math.abs(msg.vector.x), 0);
+            addData(up_chart, duration, Math.abs(msg.vector.z), 0);
         }
 
-        accumulated_error = accumulated_error +
+        raw_diff.push([duration, msg.vector.x, msg.vector.y, msg.vector.z])
+
+        accumulated_error_without_z = accumulated_error_without_z +
             msg.vector.x * msg.vector.x +
-            msg.vector.y * msg.vector.y +
+            msg.vector.y * msg.vector.y;
+        accumulated_error = accumulated_error_without_z +
             msg.vector.z * msg.vector.z;
+
         accumulated_nb += 1;
-    })
+
+        console.log('difference_best_bestgnss', accumulated_nb, accumulated_error_without_z, accumulated_error);
+    });
+
 });

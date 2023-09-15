@@ -21,7 +21,7 @@ def read_data_into_dataframe(file_path):
 
 
 # Function to parse the GPS time and other relevant fields from the raw line
-def parse_line(row):
+def parse_line(row, year, month, day):
     line = row['raw_line']
 
     # Splitting the line by comma to identify the command type
@@ -54,11 +54,9 @@ def parse_line(row):
         # year = int('20' + date[4:6])
         # month = int(date[2:4])
         # day = int(date[0:2])
-        year = 2023
-        month = 7
-        day = 3
         utc_time = datetime(
-            year, month, day, int(utc_time_str_first[0:2]), int(utc_time_str_first[2:4]), int(utc_time_str_first[4:6]),
+            int(year), int(month), int(day),
+            int(utc_time_str_first[0:2]), int(utc_time_str_first[2:4]), int(utc_time_str_first[4:6]),
             int(utc_time_microsecs))
         gps_week, gps_seconds = utc_to_gps_week_seconds(utc_time)
         gps_time = str(gps_week) + ',' + '{:.3f}'.format(gps_seconds)

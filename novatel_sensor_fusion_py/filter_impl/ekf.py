@@ -60,6 +60,8 @@ class ExtendedKalmanFilter16States:
         self.dvel = None
         self.dangle = None
 
+        self.debug = None
+
     def get_state(self):
         return self.state
 
@@ -247,8 +249,8 @@ class ExtendedKalmanFilter16States:
 
         next_state[0:4] = q_repair
 
-        next_state[10:16] = self.state[10:16]
         self.set_state(next_state)
+        self.set_state_covariance(self.compute_next_state_covariance(dt))
 
     def control_input_jacobian(self):
         qw = self.state[0]
@@ -294,17 +296,18 @@ class ExtendedKalmanFilter16States:
             self.control_input_noise() + self.additive_process_noise()
         return next_state_covariance
 
-    def fuse_gps(self, gps_position, gps_velocity, gps_position_std, gps_velocity_std):
+    def fuse_gps_position_velocity(self, gps_position, gps_velocity, gps_position_std, gps_velocity_std):
         # gps position is given in ENU coordinate system
         measure_noise_w = np.zeros(6)
         measure_noise_w[0:3] = gps_position_std
+
         measure_noise_w[3:6] = gps_velocity_std
         measure_cov = np.diag(measure_noise_w)
 
         z = np.array([gps_position[0], gps_position[1], gps_position[2],
                       gps_velocity[0], gps_velocity[1], gps_velocity[2]])
-        h = self.measure_fun()
-        dhdx = self.measure_jacobian_fun()
+        h = self.measure_fun_gps_position_velocity()
+        dhdx = self.measure_jacobian_fun_gps_position_velocity()
 
         p = self.get_state_covariance()
         innov_covariance = dhdx @ p @ np.transpose(dhdx) + measure_cov
@@ -312,6 +315,8 @@ class ExtendedKalmanFilter16States:
 
         w = p @ np.transpose(dhdx) @ np.linalg.inv(innov_covariance)
         state = self.get_state() + w @ innov
+        # print("gps position std", gps_position_std)
+        # print(tmp[4:7])
         p = p - w @ dhdx @ p
 
         q = state[0:4]
@@ -321,10 +326,43 @@ class ExtendedKalmanFilter16States:
         self.set_state(state)
         self.set_state_covariance(p)
 
-    def measure_fun(self):
+    def fuse_gps_position(self, gps_position, gps_position_std):
+        # gps position is given in ENU coordinate system
+        measure_noise_w = np.zeros(3)
+        measure_noise_w[0:3] = gps_position_std
+
+        measure_cov = np.diag(measure_noise_w)
+
+        z = np.array([gps_position[0], gps_position[1], gps_position[2]])
+        h = self.measure_fun_gps_position()
+        dhdx = self.measure_jacobian_fun_gps_position()
+
+        p = self.get_state_covariance()
+        innov_covariance = dhdx @ p @ np.transpose(dhdx) + measure_cov
+        innov = z - h
+
+        self.debug = innov
+
+        w = p @ np.transpose(dhdx) @ np.linalg.inv(innov_covariance)
+        state = self.get_state() + w @ innov
+        # print("gps position std", gps_position_std)
+        # print(tmp[4:7])
+        p = p - w @ dhdx @ p
+
+        q = state[0:4]
+        q = repair_quaternion(q)
+        state[0:4] = q
+
+        self.set_state(state)
+        self.set_state_covariance(p)
+
+    def measure_fun_gps_position_velocity(self):
         return self.state[4:10]
 
-    def measure_jacobian_fun(self):
+    def measure_fun_gps_position(self):
+        return self.state[4:7]
+
+    def measure_jacobian_fun_gps_position_velocity(self):
         dhdx = np.zeros((6, 16))
         dhdx[0, 4] = 1
         dhdx[1, 5] = 1
@@ -332,6 +370,13 @@ class ExtendedKalmanFilter16States:
         dhdx[3, 7] = 1
         dhdx[4, 8] = 1
         dhdx[5, 9] = 1
+        return dhdx
+
+    def measure_jacobian_fun_gps_position(self):
+        dhdx = np.zeros((3, 16))
+        dhdx[0, 4] = 1
+        dhdx[1, 5] = 1
+        dhdx[2, 6] = 1
         return dhdx
 
     def set_state(self, state):

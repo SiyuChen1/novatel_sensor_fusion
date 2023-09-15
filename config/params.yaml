@@ -7,6 +7,9 @@
   gnss_imu_subscriber:
     ros__parameters:
       imu_topic_name: /imu
+      use_gnss_velocity: true
+      init_state_covariance: 1e-2
+      other_additive_noise: 1e-4
 /**:
   ros__parameters:
     best_topic_name: /best

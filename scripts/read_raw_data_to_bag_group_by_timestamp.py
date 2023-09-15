@@ -4,8 +4,9 @@ from geometry_msgs.msg import TransformStamped
 from novatel_sensor_fusion.msg import NavRMC, NavSat, NavSatExtended
 from novatel_sensor_fusion_py.raw_data_to_bag.data2rosmsg import gps_time_to_ros_time
 from novatel_sensor_fusion_py.ultilies.datatime_convert import dms_to_decimal
-from novatel_sensor_fusion_py.ultilies.group_raw_data_by_timestamp import read_data_into_dataframe, parse_line
+from novatel_sensor_fusion_py.ultilies.group_raw_data_by_timestamp import parse_line, read_data_into_dataframe
 import rclpy
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 from rclpy.serialization import serialize_message
 from rclpy.time import Time
@@ -16,12 +17,41 @@ import transforms3d
 
 
 class ImuRawDataBagRecorder(Node):
-    def __init__(self, topic_infos, raw_data_file_path, bag_name, imu_data_rate, translation):
+    def __init__(self, topic_infos, imu_data_rate, translation, ignore=True):
         super().__init__('imu_raw_data_bag_recorder')
+        """
+        ignore: whether ignore the first 10% of the recorded data
+        """
         self.writer = rosbag2_py.SequentialWriter()
 
+        self.declare_parameter(
+            'file_path', descriptor=ParameterDescriptor(
+                name='file_path', type=4
+                # https://docs.ros2.org/foxy/api/rcl_interfaces/msg/ParameterType.html
+                # uint8 PARAMETER_STRING=4
+            )
+        )
+
+        self.declare_parameter(
+            'ros2bag_name', descriptor=ParameterDescriptor(
+                name='ros2bag_name', type=4
+                # https://docs.ros2.org/foxy/api/rcl_interfaces/msg/ParameterType.html
+                # uint8 PARAMETER_STRING=4
+            )
+        )
+
+        # raw_data_file_path = self.get_parameter('file_path').get_parameter_value().string_value
+        # ros2bag_name = self.get_parameter('ros2bag_name').get_parameter_value().string_value
+        ros2bag_name = '20230907_Laurensberg'
+        raw_data_file_path = '/home/siyuchen/Documents/20230907/20230907_122749/IMUData_20230907_122749.log'
+        date = raw_data_file_path.split('/')[-1]
+        date = date.split('_')[1]
+        year = int(date[0:4])
+        month = int(date[4:6])
+        day = int(date[6:8])
+
         storage_options = rosbag2_py._storage.StorageOptions(
-            uri=bag_name,
+            uri=ros2bag_name,
             storage_id='mcap')
         converter_options = rosbag2_py._storage.ConverterOptions('', '')
         self.writer.open(storage_options, converter_options)
@@ -49,10 +79,13 @@ class ImuRawDataBagRecorder(Node):
         imu_data_df = read_data_into_dataframe(raw_data_file_path)
 
         # Applying the parse_line function to the DataFrame
-        parsed_data_df = imu_data_df.apply(parse_line, axis=1).dropna()
+        parsed_data_df = imu_data_df.apply(parse_line, axis=1, args=(year, month, day)).dropna()
 
         # Grouping the data by GPS time
         self.grouped_data_df = list(parsed_data_df.groupby('gps_time'))
+
+        delete_index = len(self.grouped_data_df) * 0.10
+        del self.grouped_data_df[0: int(delete_index)]
 
     def write_data_to_bag(self):
         only_best = 0
@@ -62,7 +95,6 @@ class ImuRawDataBagRecorder(Node):
         for indx in range(len(self.grouped_data_df)):
             data = self.grouped_data_df[indx]
             gps_time_str = data[0].split(',')
-            # print(gps_time_str)
 
             # print(type(data[1]))
             # <class 'pandas.core.frame.DataFrame'>
@@ -71,7 +103,6 @@ class ImuRawDataBagRecorder(Node):
             # Index(['command_type', 'gps_time', 'raw_line'], dtype='object')
 
             stamp = gps_time_to_ros_time(gps_week=gps_time_str[0], seconds_in_week=gps_time_str[1])
-            # print(stamp)
             # len(data[1]) is the number of raw data lines
 
             command_types = list(data[1]['command_type'])
@@ -91,8 +122,8 @@ class ImuRawDataBagRecorder(Node):
                 imu_msg.header.frame_id = 'vehicle'
 
             for _, row in data[1].iterrows():
-                # print(row['command_type'])
-                # print(row['raw_line'])
+                # self.get_logger.info(row['command_type'])
+                # self.get_logger.info(row['raw_line'])
                 raw_data = row['raw_line']
                 if ';' in raw_data:
                     data = raw_data.split(';')[1]
@@ -271,10 +302,10 @@ class ImuRawDataBagRecorder(Node):
                     '/imu', serialize_message(imu_msg),
                     Time.from_msg(stamp).nanoseconds)
 
-        print(f'In msg, {only_bestgnss} only has bestgnsspos')
-        print(f'In msg, {only_bestgnssvel} only has bestgnssposvel')
-        print(f'In msg, {only_best} only has bestpos')
-        print(f'In msg, {only_bestvel} only has bestvel')
+        self.get_logger().info(f'In msg, {only_bestgnss} only has bestgnsspos')
+        self.get_logger().info(f'In msg, {only_bestgnssvel} only has bestgnssposvel')
+        self.get_logger().info(f'In msg, {only_best} only has bestpos')
+        self.get_logger().info(f'In msg, {only_bestvel} only has bestvel')
 
 
 def main(args=None):
@@ -294,24 +325,23 @@ def main(args=None):
 
     imu_data_rate = 100
 
-    rosbag_name = 'imu_raw_data_bag_recorder'
-
-    # translation_imu2ll = [dx, dy, dz] is the translation from IMU frame to
-    # instantaneous local level frame (ENU), i.e. antenna1. Since after rotating 180 degree around 180 degrees
+    # translation_imu2lla = [dx, dy, dz] is the translation from IMU frame to
+    # instantaneous local level frame (ENU), i.e. antenna1. Since after rotating X axis around 180 degrees
     # the IMU frame is transformed to the vehicle frame.
     # the translation from vehicle frame to the instantaneous local level frame (ENU) is [dx, -dy, -dz]
     dx = 0.431
     dy = 0.0
-    dz = 0.013
+    dz = -0.013
     translation_imu2antenna_1 = [dx, dy, dz]
     translation = [dx, -dy, -dz]
 
     recorder = ImuRawDataBagRecorder(
         topic_infos=topic_infos,
-        raw_data_file_path=file_path,
-        bag_name=rosbag_name,
+        # raw_data_file_path=file_path,
+        # bag_name=rosbag_name,
         imu_data_rate=imu_data_rate,
-        translation=translation
+        translation=translation,
+        ignore=True
     )
 
     recorder.write_data_to_bag()
