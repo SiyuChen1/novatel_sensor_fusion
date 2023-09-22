@@ -1,17 +1,17 @@
+import launch
 from launch import LaunchDescription
+from launch.actions import SetLaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
     return LaunchDescription([
+        SetLaunchConfiguration('config_file', value=[launch.substitutions.ThisLaunchFileDir(), '/../config/raw_data.yaml']),
         Node(
             package='novatel_sensor_fusion',
             namespace='/ros2bag',
             executable='read_raw_data_to_bag_group_by_timestamp.py',
             name='raw_data_to_ros2bag',
-            parameters=[{
-                'file_path': '/home/siyuchen/Documents/20230907/20230907_122749/IMUData_20230907_122749.log',
-                'ros2bag_name': '20230907_Laurensberg'
-            }]
+            parameters=[launch.substitutions.LaunchConfiguration('config_file')]
         )
     ])

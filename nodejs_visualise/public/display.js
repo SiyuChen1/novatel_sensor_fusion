@@ -288,8 +288,7 @@ function saveAsCSV(array2D, fileName) {
     downloadAnchorNode.remove();
 }
 
-
-L.Control.CustomButton = L.Control.extend({
+L.Control.ViewerButton = L.Control.extend({
     options: {
         position: 'topright'
     },
@@ -311,9 +310,6 @@ L.Control.CustomButton = L.Control.extend({
                 button.innerHTML = 'Display Plot';
                 map.invalidateSize();
                 display_plot = false;
-
-                saveAsCSV(fused_diff, 'fused_diff');
-                saveAsCSV(raw_diff, 'raw_diff')
             }
         });
 
@@ -321,8 +317,30 @@ L.Control.CustomButton = L.Control.extend({
     }
 });
 
-L.control.customButton = function(opts) {
-    return new L.Control.CustomButton(opts);
+L.control.ViewerButton = function(opts) {
+    return new L.Control.ViewerButton(opts);
+}
+
+L.Control.SaveFileButton = L.Control.extend({
+    options: {
+        position: 'topright'
+    },
+
+    onAdd: function(map) {
+        var button = L.DomUtil.create('button', 'my-custom-button');
+        button.innerHTML = 'Save';
+
+        L.DomEvent.on(button, 'click', function() {
+            saveAsCSV(fused_diff, 'fused_diff');
+            saveAsCSV(raw_diff, 'raw_diff')
+        });
+
+        return button;
+    }
+});
+
+L.control.SaveFileButton = function(opts) {
+    return new L.Control.SaveFileButton(opts);
 }
 
 L.Control.Label = L.Control.extend({
@@ -441,7 +459,8 @@ document.addEventListener('DOMContentLoaded', () => {
         maxZoom: 19
     }).addTo(map);
 
-    L.control.customButton().addTo(map);
+    L.control.ViewerButton().addTo(map);
+    L.control.SaveFileButton().addTo(map);
 
     cur_polyline = L.polyline([], {color: orange, weight: polyline_width}).addTo(map);
     ref_polyline = L.polyline([], {color: teal, weight: polyline_width}).addTo(map);
