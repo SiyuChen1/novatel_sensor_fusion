@@ -40,10 +40,9 @@ class ImuRawDataBagRecorder(Node):
             )
         )
 
-        # raw_data_file_path = self.get_parameter('file_path').get_parameter_value().string_value
-        # ros2bag_name = self.get_parameter('ros2bag_name').get_parameter_value().string_value
-        ros2bag_name = '20230907_Laurensberg'
-        raw_data_file_path = '/home/siyuchen/Documents/20230907/20230907_122749/IMUData_20230907_122749.log'
+        raw_data_file_path = self.get_parameter('file_path').get_parameter_value().string_value
+        ros2bag_name = self.get_parameter('ros2bag_name').get_parameter_value().string_value
+        
         date = raw_data_file_path.split('/')[-1]
         date = date.split('_')[1]
         year = int(date[0:4])
