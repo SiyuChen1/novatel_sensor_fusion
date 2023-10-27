@@ -4,6 +4,7 @@
 # This is something you don’t have to do with a standard ROS2 Python package
 # (it’s managed for you), but with this setup if you don’t add this line,
 # you will get an error when you try to start the node with
+
 import re
 
 from novatel_sensor_fusion_py.raw_data_to_bag.data2rosmsg import data_to_gnss_msg, \
