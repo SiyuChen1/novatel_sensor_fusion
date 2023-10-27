@@ -71,7 +71,9 @@ class ImuRawDataBagRecorder(Node):
         self.writer.create_topic(topic_info)
 
         self.imu_data_rate = imu_data_rate
-        # the translation from instantaneous local level frame (ENU) to vehicle frame
+
+        # the translation from vehicle body frame (if it is set, then it is the default output frame)
+        # to the antenna1
         self.translation = translation
 
         # Reading the data into a DataFrame
@@ -87,6 +89,28 @@ class ImuRawDataBagRecorder(Node):
         del self.grouped_data_df[0: int(delete_index)]
 
     def write_data_to_bag(self):
+        # Assumption: the coordinate system of the antenna 1 is not well-defined.
+        # During moving, the position of the antenna 1 can be determined in the local
+        # level frame (East-North-Up). It follows definition
+        # X: East, Y: North, Z: Up
+        # At first, it is (0 0 0)^T. Then, it can be determined
+        # by function like lla2enu(lla, lla_ref). And we always assume that the rotation between
+        # antenna 1 and the local level frame is the identity matrix I.
+        # Thus at first, the local level frame is exactly the antenna 1 frame, then between antenna 1 frame and the
+        # local level frame there exist only translation.
+
+        # For example, after several seconds, in the local level frame the position of the antenna 1 is T_p and
+        # the rotation from the local level frame to the vehicle body frame is R1, and also the translation from
+        # the vehicle body frame to the antenna 1 is T2, how to determine the position of the origin of the vehicle body
+        # frame in the local level frame? i.e how to determine the translation from the local level frame to
+        # the vehicle body frame T1.
+
+        # Solution: the transform from local level frame to the antenna 1 is [I | T_p]
+        # the transform from local level frame to the vehicle body frame is [R1 | T1]
+        # the transform from the vehicle body frame to the antenna 1 is [R1^T | T2]
+        # [I | T_p] = [R1 | T1] * [R1^T | T2] => T_p = R1 * T2 + T1
+        # T1 = T_p - R1 * T2
+
         only_best = 0
         only_bestvel = 0
         only_bestgnss = 0
@@ -152,11 +176,17 @@ class ImuRawDataBagRecorder(Node):
                         imu_msg.orientation.z = z
 
                         msg = TransformStamped()
-                        # i means instantaneous
                         msg.header.stamp = stamp
                         msg.header.frame_id = 'antenna1'
                         msg.child_frame_id = 'vehicle'
 
+                        # r is the rotation from antenna1 to the vehicle body frame
+                        # self.translation is the translation from the vehicle body frame to antenna 1
+                        # let T1 = [R1 | T1] is the transform from the antenna 1 to the vehicle body frame
+                        # T2 = [R2 | T2] is the transform from the vehicle body frame to the antenna 1
+                        # T2 = inv(T1) where R2 = R1.T and T2 = -R1.T * T1
+                        # in this case r = R1 and self.translation = T2
+                        # thus T1 = - R1 * T2 = -r * self.translation
                         r = transforms3d.quaternions.quat2mat([w, x, y, z])
                         translation_base_to_child = - r @ self.translation
 
@@ -173,9 +203,9 @@ class ImuRawDataBagRecorder(Node):
                             Time.from_msg(stamp).nanoseconds)
 
                     case 'INSATTXA':
-                        # this log contains redundant rotation information from local level frame to vehicle body frame
-                        # which is redundant to the log 'INSATTQSA', additionally this log contains the standard
-                        # deviation of the roll, pitch, yaw angles
+                        # this log contains redundant rotation information from local level frame (ENU)
+                        # to vehicle body frame which is redundant to the log 'INSATTQSA',
+                        # additionally this log contains the standard deviation of the roll, pitch, yaw angles
                         pass
 
                     case 'GPRMC':
@@ -324,14 +354,24 @@ def main(args=None):
 
     imu_data_rate = 100
 
-    # translation_imu2lla = [dx, dy, dz] is the translation from IMU frame to
-    # instantaneous local level frame (ENU), i.e. antenna1. Since after rotating X axis around 180 degrees
+    # translation_imu2antenna1 = [dx, dy, dz] is the translation from IMU frame to
+    # antenna1 frame, i.e. antenna1. Since after rotating X axis around 180 degrees
     # the IMU frame is transformed to the vehicle frame.
-    # the translation from vehicle frame to the instantaneous local level frame (ENU) is [dx, -dy, -dz]
+    # the translation from vehicle frame to the antenna 1 is [dx, -dy, -dz].
+
+    # e.g.
+    # SETINSTRANSLATION ANT1 0.431 0.0 -0.013 0.001 0.001 0.001 IMUBODY
+    # SETINSTRANSLATION ANT2 -0.506 0.0 -0.013 0.001 0.001 0.001 IMUBODY
+    #
+    # SETINSTRANSLATION ANT1 0.431 0.0 0.013 0.001 0.001 0.001 VEHICLE
+    # SETINSTRANSLATION ANT2 -0.506 0.0 0.013 0.001 0.001 0.001 VEHICLE
+
     dx = 0.431
     dy = 0.0
     dz = -0.013
-    translation_imu2antenna_1 = [dx, dy, dz]
+
+    # Since the vehicle body frame is the default output frame if it is set
+    # thus the translation from vehicle body frame to the antenna 1 is preferred
     translation = [dx, -dy, -dz]
 
     recorder = ImuRawDataBagRecorder(
@@ -340,7 +380,7 @@ def main(args=None):
         # bag_name=rosbag_name,
         imu_data_rate=imu_data_rate,
         translation=translation,
-        ignore=True
+        ignore=False
     )
 
     recorder.write_data_to_bag()
