@@ -4,7 +4,7 @@
 <!--    https://design.ros2.org/articles/roslaunch_xml.html#include-tag-->
 
 <!--    <arg name="bag_path" default="/home/siyuchen/catkin_ws/src/novatel_sensor_fusion/rosbag_data/bag_split_2/bag_split_2_0.mcap" description="ros2 bag file which contains raw data" />-->
-    <arg name="bag_path" default="/home/siyuchen/catkin_ws/20230922_UniKlinikum/20230922_UniKlinikum_0.mcap"
+    <arg name="bag_path" default="/home/siyuchen/catkin_ws/20231031_105114_Blausteinsee/20231031_105114_Blausteinsee_0.mcap"
          description="ros2 bag file which contains raw data" />
 
     <arg name="nodejs_path" default="/home/siyuchen/catkin_ws/src/novatel_sensor_fusion/nodejs_visualise"
