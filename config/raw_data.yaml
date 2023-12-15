@@ -1,4 +1,4 @@
 /**:
   ros__parameters:
-    file_path: /home/siyuchen/Documents/20230922/20230922_105831/IMUData_20230922_105831.log
-    ros2bag_name: 20230922_UniKlinikum
+    file_path: /home/siyuchen/Documents/rivercloud_dataset/20231031/20231031_105114/IMUData_20231031_105114.log
+    ros2bag_name: 20231031_105114_Blausteinsee
