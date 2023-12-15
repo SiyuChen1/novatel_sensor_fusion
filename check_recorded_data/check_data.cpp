@@ -263,7 +263,7 @@ int main(int argc, char* argv[]) {
     std::cout.rdbuf(coutbuf);
 
     // Close the file
-    file.close();
+    out_file.close();
 
     return 0;
 
