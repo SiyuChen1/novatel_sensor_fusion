@@ -72,6 +72,9 @@ class ImuRawDataBagRecorder(Node):
         # raw_data_file_path = '/home/siyuchen/Downloads/data/dataset/rivercloud_dataset/20231031/20231031_105114/IMUData_20231031_105114.log'
         # ros2bag_name = '20231031_105114_Blausteinsee'
 
+        raw_data_file_path = self.get_parameter('file_path').get_parameter_value().string_value
+        ros2bag_name = self.get_parameter('ros2bag_name').get_parameter_value().string_value
+
         storage_options = rosbag2_py._storage.StorageOptions(
             uri=ros2bag_name,
             storage_id='mcap')
@@ -154,6 +157,8 @@ class ImuRawDataBagRecorder(Node):
         only_bestgnssvel = 0
         for indx in range(len(self.parsed_data_df)):
             data = self.parsed_data_df[indx]
+        for indx in range(len(self.grouped_data_df)):
+            data = self.grouped_data_df[indx]
             gps_time_str = data[0].split(',')
 
             # print(type(data[1]))
@@ -440,11 +445,6 @@ def main(args=None):
                    '/bestutm': 'novatel_sensor_fusion/msg/NavUTM',
                    '/bestxyz': 'novatel_sensor_fusion/msg/NavECEF'}
 
-    # file_path = '/home/siyuchen/Documents/Novatel_Stereocam_Daten_20230703' \
-    #             '/20230703_140222/IMUData_20230703_140222.log'
-
-    # file_path = '/home/siyuchen/catkin_ws/src/novatel_sensor_fusion' \
-    #             '/jupyter_notebook/data/small_raw_imu_data.txt'
 
     imu_data_rate = 100
 
@@ -459,6 +459,7 @@ def main(args=None):
     #
     # SETINSTRANSLATION ANT1 0.431 0.0 0.013 0.001 0.001 0.001 VEHICLE
     # SETINSTRANSLATION ANT2 -0.506 0.0 0.013 0.001 0.001 0.001 VEHICLE
+
     # dx = 0.431
     # dy = 0.0
     # dz = -0.013

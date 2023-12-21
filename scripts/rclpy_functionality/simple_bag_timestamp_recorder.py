@@ -2,6 +2,7 @@
 
 # this script shows that the order of writing ros messages doesn't affect the order of replaying rosbag
 # only the timestamp matters
+
 import rclpy
 from rclpy.duration import Duration
 from rclpy.node import Node

@@ -1,4 +1,5 @@
 # Check rotation between IMU body and vehicle frame
+
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
@@ -57,7 +58,6 @@ with open(raw_imu_path, 'r') as file:
                 imu_ts.append(gyroscope_factor * float(data[8].split('*')[0]) * freq)
 
                 raw_imu_ts_array.append(imu_ts)
-
             if raw_imu_count % 80000 == 0:
                 print(f"{raw_imu_count} raw imu data have been processed")
         elif line.strip() and 'CORRIMUSA' in line:
@@ -139,6 +139,7 @@ g = -filtered_cor_imu[:, 1:4] + filtered_raw_imu[:, 1:4]
 t_diff = 1 / 100 * (filtered_cor_imu[:, 0] - filtered_raw_imu[:, 0])
 t = 1 / 100 * filtered_raw_imu[:, 0]
 print(np.linalg.norm(g[0:10, :], axis=1))
+
 
 # Creating the figure
 plt.figure(figsize=(15, 10))
