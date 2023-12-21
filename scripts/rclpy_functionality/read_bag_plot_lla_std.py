@@ -1,3 +1,4 @@
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -6,13 +7,16 @@ from rclpy.serialization import deserialize_message
 import rosbag2_py
 
 
-def convert_to_seconds(time):
-    return time.sec + time.nanosec / 1e9
-
+parser = argparse.ArgumentParser(description="Visualizing LLA Standard Deviation")
+parser.add_argument("--bag-file-path", type=str,
+                    default='/home/siyuchen/catkin_ws/imu_raw_data_bag_recorder/imu_raw_data_bag_recorder_0.mcap')
 
 # Path to the bag file
-bag_file_path = '/home/siyuchen/catkin_ws/' \
-                'imu_raw_data_bag_recorder/imu_raw_data_bag_recorder_0.mcap'
+# bag_file_path = '/home/siyuchen/catkin_ws/' \
+#                 'imu_raw_data_bag_recorder/imu_raw_data_bag_recorder_0.mcap'
+# Parse the arguments
+args = parser.parse_args()
+bag_file_path = args.bag_file_path
 
 # Create a reader
 reader = rosbag2_py.SequentialReader()
@@ -43,18 +47,11 @@ while reader.has_next():
 bestgnss = np.array(bestgnss)
 x_id = list(range(bestgnss.shape[0]))
 
-print(bestgnss[4880, 0])
-print(bestgnss[6580, 0])
-print(bestgnss[8400, 0])
-print(bestgnss[11800, 0])
-print(bestgnss[11900, 0])
-print(bestgnss[13770, 0])
-
-# plt.plot(x_id, bestgnss[:, 1], label='latitude')
-# plt.plot(x_id, bestgnss[:, 2], label='longitude')
-# plt.plot(x_id, bestgnss[:, 3], label='altitude')
-# plt.title('standard deviation of gnss measurements')
-# plt.xlabel('measurement count')
-# plt.ylabel('std in m')
-# plt.legend()
-# plt.show()
+plt.plot(x_id, bestgnss[:, 1], label='latitude')
+plt.plot(x_id, bestgnss[:, 2], label='longitude')
+plt.plot(x_id, bestgnss[:, 3], label='altitude')
+plt.title('standard deviation of gnss measurements')
+plt.xlabel('measurement count')
+plt.ylabel('std in m')
+plt.legend()
+plt.show()

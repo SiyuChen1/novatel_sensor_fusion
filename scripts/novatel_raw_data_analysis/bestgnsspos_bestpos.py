@@ -2,11 +2,12 @@
 # this script illustrates comparing gnss and bestgnss logs
 
 import argparse
-from gps_time import GPSTime
-import matplotlib.pyplot as plt
-import numpy as np
 import os
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+from gps_time import GPSTime
 
 
 def plot_bestgnsspos_bestpos(abs_path, file_name):
@@ -69,11 +70,11 @@ file_name = args.file_name
 
 bestgnsspos, bestpos, gnss_std, bestgnsspos_ts, bestpos_ts = plot_bestgnsspos_bestpos(folder_path, file_name)
 # print(bestgnsspos.shape)
-print(gnss_std.shape)
+# print(gnss_std.shape)
 print(bestgnsspos_ts[9080])
 start_id = search_specific_gps_time(bestgnsspos_ts, time_of_week=130801)
 end_id = search_specific_gps_time(bestgnsspos_ts, time_of_week=130911)
-print(start_id, end_id)
+# print(start_id, end_id)
 
 fig, axs = plt.subplots(3, 1)
 axs[0].set_title('Latitude')

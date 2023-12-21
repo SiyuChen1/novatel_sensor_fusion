@@ -60,5 +60,5 @@ for i, f in enumerate(file_names):
 plt.legend()
 plt.axis('equal')
 plt.xlabel('East m')
-plt.xlabel('North m')
+plt.ylabel('North m')
 plt.show()

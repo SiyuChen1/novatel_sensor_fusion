@@ -10,7 +10,6 @@ from rclpy.serialization import deserialize_message
 import rosbag2_py
 
 
-
 parser = argparse.ArgumentParser(description="Visualizing LLA")
 parser.add_argument("--bag-file-path", type=str,
                     default='/home/siyuchen/catkin_ws/imu_raw_data_bag_recorder/imu_raw_data_bag_recorder_0.mcap')
@@ -62,10 +61,6 @@ while reader.has_next():
         case '/bestgnss':
             msg = deserialize_message(msg_bytes, NavSatExtended)
             bestgnss.append([ts, msg.latitude, msg.longitude, msg.altitude])
-
-        case '/bestutm':
-            msg = deserialize_message(msg_bytes, NavSat)
-            bestutm.append([ts, msg.latitude, msg.longitude, msg.altitude])
 
 # Close the reader
 del reader
