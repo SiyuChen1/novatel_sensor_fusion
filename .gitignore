@@ -62,4 +62,4 @@ cmake-build-debug
 **/cmake*
 **/.idea*
 
-data/gnss_imu_logs
+data/**
