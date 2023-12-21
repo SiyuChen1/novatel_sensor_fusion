@@ -2,15 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from novatel_sensor_fusion.msg import NavRMC, NavSat, NavSatExtended
-from novatel_sensor_fusion_py.lla2geodetic.lla2geodetic import lla2enu
-import novatel_sensor_fusion_py.ultilies.color as color
-from novatel_sensor_fusion_py.ultilies.trajectory_similarity import compute_rmse_between_trajectories
 from rclpy.serialization import deserialize_message
 import rosbag2_py
-
-
-def convert_to_seconds(time):
-    return time.sec + time.nanosec / 1e9
 
 
 # Path to the bag file
@@ -80,6 +73,7 @@ axs[0].plot(gpggalong[:, 0], gpggalong[:, 1], label='GPGGALong')
 axs[0].plot(best[:, 0], best[:, 1], label='BEST')
 axs[0].set_xlabel('Time')
 axs[0].set_ylabel('Latitude in degree')
+axs[0].legend()
 axs[0].ticklabel_format(useOffset=False)
 
 axs[1].plot(gprmc[:, 0], gprmc[:, 2], label='GPRMC')
@@ -89,6 +83,7 @@ axs[1].plot(best[:, 0], best[:, 2], label='BEST')
 axs[1].ticklabel_format(useOffset=False)
 axs[1].set_xlabel('Time')
 axs[1].set_ylabel('Longitude in degree')
+axs[0].legend()
 
 axs[2].plot(gpgga[:, 0], gpgga[:, 3], label='GPGGA')
 axs[2].plot(gpggalong[:, 0], gpggalong[:, 3], label='GPGGALong')

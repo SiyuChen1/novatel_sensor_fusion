@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
 from geometry_msgs.msg import TransformStamped
-from novatel_sensor_fusion.msg import NavRMC, NavSat, NavSatExtended
+from novatel_sensor_fusion.msg import NavECEF, NavRMC, NavSat, NavSatExtended, NavUTM
 from novatel_sensor_fusion_py.raw_data_to_bag.data2rosmsg import gps_time_to_ros_time
 from novatel_sensor_fusion_py.ultilies.datatime_convert import dms_to_decimal
 from novatel_sensor_fusion_py.ultilies.group_raw_data_by_timestamp import parse_line, read_data_into_dataframe
+import numpy as np
 import rclpy
 from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
@@ -13,11 +14,13 @@ from rclpy.time import Time
 import rosbag2_py
 from sensor_msgs.msg import Imu
 from tf2_msgs.msg import TFMessage
-import transforms3d
+from scipy.spatial.transform import Rotation as R
 
 
 class ImuRawDataBagRecorder(Node):
-    def __init__(self, topic_infos, imu_data_rate, translation, ignore=True):
+    def __init__(self, topic_infos,
+                 imu_data_rate,
+                 ignore=True):
         super().__init__('imu_raw_data_bag_recorder')
         """
         ignore: whether ignore the first 10% of the recorded data
@@ -40,14 +43,34 @@ class ImuRawDataBagRecorder(Node):
             )
         )
 
+        self.declare_parameter(
+            'translation_imu_antenna1', descriptor=ParameterDescriptor(
+                name='translation_imu_antenna1', type=8
+                # https://docs.ros2.org/foxy/api/rcl_interfaces/msg/ParameterType.html
+                # uint8 PARAMETER_STRING=4
+            )
+        )
+
+        self.declare_parameter(
+            'rotation_imu_vehicle', descriptor=ParameterDescriptor(
+                name='ros2bag_name', type=8
+                # https://docs.ros2.org/foxy/api/rcl_interfaces/msg/ParameterType.html
+                # uint8 PARAMETER_STRING=4
+            )
+        )
+
         raw_data_file_path = self.get_parameter('file_path').get_parameter_value().string_value
         ros2bag_name = self.get_parameter('ros2bag_name').get_parameter_value().string_value
-        
-        date = raw_data_file_path.split('/')[-1]
-        date = date.split('_')[1]
-        year = int(date[0:4])
-        month = int(date[4:6])
-        day = int(date[6:8])
+        translation_imu_antenna1 = \
+            self.get_parameter('translation_imu_antenna1').get_parameter_value().double_array_value.tolist()
+        rotation_imu_vehicle_angles = \
+            self.get_parameter('rotation_imu_vehicle').get_parameter_value().double_array_value.tolist()
+
+        self.get_logger().info(str(type(translation_imu_antenna1)))
+        self.get_logger().info(str(type(rotation_imu_vehicle_angles)))
+
+        # raw_data_file_path = '/home/siyuchen/Downloads/data/dataset/rivercloud_dataset/20231031/20231031_105114/IMUData_20231031_105114.log'
+        # ros2bag_name = '20231031_105114_Blausteinsee'
 
         storage_options = rosbag2_py._storage.StorageOptions(
             uri=ros2bag_name,
@@ -74,19 +97,33 @@ class ImuRawDataBagRecorder(Node):
 
         # the translation from vehicle body frame (if it is set, then it is the default output frame)
         # to the antenna1
-        self.translation = translation
+        # P(imu->antenna1) = T(imu->vehicle) + R(imu->vehicle) @ P(vehicle->antenna1)
+        # thus, P(vehicle->antenna1) = inv(R(imu->vehicle)) @ (P(imu->antenna1) - T(imu->vehicle))
+        # Since T(imu->vehicle) = [0, 0, 0]
+        # P(vehicle->antenna1) = inv(R(imu->vehicle)) @ P(imu->antenna1)
+        rotation_imu_vehicle = R.from_euler('zxy', rotation_imu_vehicle_angles, degrees=True).as_matrix()
+        self.translation_vehicle_antenna1 = np.linalg.inv(rotation_imu_vehicle) @ translation_imu_antenna1
 
         # Reading the data into a DataFrame
         imu_data_df = read_data_into_dataframe(raw_data_file_path)
+
+        date = raw_data_file_path.split('/')[-1]
+        date = date.split('_')[1]
+        year = int(date[0:4])
+        month = int(date[4:6])
+        day = int(date[6:8])
 
         # Applying the parse_line function to the DataFrame
         parsed_data_df = imu_data_df.apply(parse_line, axis=1, args=(year, month, day)).dropna()
 
         # Grouping the data by GPS time
-        self.grouped_data_df = list(parsed_data_df.groupby('gps_time'))
+        self.parsed_data_df = list(parsed_data_df.groupby('gps_time'))
 
-        delete_index = len(self.grouped_data_df) * 0.10
-        del self.grouped_data_df[0: int(delete_index)]
+        if ignore:
+            delete_index = len(self.parsed_data_df) * 0.10
+            del self.parsed_data_df[0: int(delete_index)]
+        else:
+            self.grouped_data_df = parsed_data_df
 
     def write_data_to_bag(self):
         # Assumption: the coordinate system of the antenna 1 is not well-defined.
@@ -115,8 +152,8 @@ class ImuRawDataBagRecorder(Node):
         only_bestvel = 0
         only_bestgnss = 0
         only_bestgnssvel = 0
-        for indx in range(len(self.grouped_data_df)):
-            data = self.grouped_data_df[indx]
+        for indx in range(len(self.parsed_data_df)):
+            data = self.parsed_data_df[indx]
             gps_time_str = data[0].split(',')
 
             # print(type(data[1]))
@@ -181,14 +218,14 @@ class ImuRawDataBagRecorder(Node):
                         msg.child_frame_id = 'vehicle'
 
                         # r is the rotation from antenna1 to the vehicle body frame
-                        # self.translation is the translation from the vehicle body frame to antenna 1
+                        # self.translation_vehicle_antenna1 is the translation from the vehicle body frame to antenna 1
                         # let T1 = [R1 | T1] is the transform from the antenna 1 to the vehicle body frame
                         # T2 = [R2 | T2] is the transform from the vehicle body frame to the antenna 1
                         # T2 = inv(T1) where R2 = R1.T and T2 = -R1.T * T1
-                        # in this case r = R1 and self.translation = T2
-                        # thus T1 = - R1 * T2 = -r * self.translation
-                        r = transforms3d.quaternions.quat2mat([w, x, y, z])
-                        translation_base_to_child = - r @ self.translation
+                        # in this case r = R1 and self.translation_vehicle_antenna1 = T2
+                        # thus T1 = - R1 * T2 = -r * self.translation_vehicle_antenna1
+                        r = R.from_quat([x, y, z, w]).as_matrix()
+                        translation_base_to_child = - r @ self.translation_vehicle_antenna1
 
                         msg.transform.rotation = imu_msg.orientation
 
@@ -207,6 +244,61 @@ class ImuRawDataBagRecorder(Node):
                         # to vehicle body frame which is redundant to the log 'INSATTQSA',
                         # additionally this log contains the standard deviation of the roll, pitch, yaw angles
                         pass
+
+                    case 'BESTXYZA':
+                        xyz_msg = NavECEF()
+                        xyz_msg.header.stamp = stamp
+                        xyz_msg.header.frame_id = 'antenna1'
+                        xyz_msg.pos_sol_status = data[0]
+                        xyz_msg.pos_type = data[1]
+                        xyz_msg.pos.x = float(data[2])
+                        xyz_msg.pos.y = float(data[3])
+                        xyz_msg.pos.z = float(data[4])
+                        xyz_msg.pos_covariance[0] = float(data[5])
+                        xyz_msg.pos_covariance[4] = float(data[6])
+                        xyz_msg.pos_covariance[8] = float(data[7])
+                        xyz_msg.vel_sol_status = data[8]
+                        xyz_msg.vel_type = data[9]
+                        xyz_msg.vel.x = float(data[10])
+                        xyz_msg.vel.y = float(data[11])
+                        xyz_msg.vel.z = float(data[12])
+                        xyz_msg.vel_covariance[0] = float(data[13])
+                        xyz_msg.vel_covariance[4] = float(data[14])
+                        xyz_msg.vel_covariance[8] = float(data[15])
+                        xyz_msg.base_station_id = data[16]
+                        xyz_msg.diff_age = float(data[18])
+                        xyz_msg.sol_age = float(data[19])
+                        xyz_msg.nb_sat_tracked = int(data[20])
+                        xyz_msg.nb_sat_solution = int(data[21])
+
+                        self.writer.write(
+                            '/bestxyz', serialize_message(xyz_msg),
+                            Time.from_msg(stamp).nanoseconds)
+
+                    case 'BESTUTMA':
+                        utm_msg = NavUTM()
+                        utm_msg.header.stamp = stamp
+                        utm_msg.header.frame_id = 'antenna1'
+                        utm_msg.pos_sol_status = data[0]
+                        utm_msg.pos_type = data[1]
+                        utm_msg.longitudinal_zone_num = int(data[2])
+                        utm_msg.longitudinal_zone_letter = data[3]
+                        utm_msg.northing = float(data[4])
+                        utm_msg.easting = float(data[5])
+                        utm_msg.height = float(data[6])
+                        utm_msg.undulation = float(data[7])
+                        utm_msg.pos_covariance[0] = float(data[9])
+                        utm_msg.pos_covariance[4] = float(data[10])
+                        utm_msg.pos_covariance[8] = float(data[11])
+                        utm_msg.base_station_id = data[12]
+                        utm_msg.diff_age = float(data[13])
+                        utm_msg.sol_age = float(data[14])
+                        utm_msg.nb_sat_tracked = int(data[15])
+                        utm_msg.nb_sat_solution = int(data[16])
+
+                        self.writer.write(
+                            '/bestutm', serialize_message(utm_msg),
+                            Time.from_msg(stamp).nanoseconds)
 
                     case 'GPRMC':
                         gprmc_msg = NavRMC()
@@ -344,10 +436,12 @@ def main(args=None):
                    '/gpgga': 'novatel_sensor_fusion/msg/NavSat',
                    '/gpggalong': 'novatel_sensor_fusion/msg/NavSat',
                    '/gprmc': 'novatel_sensor_fusion/msg/NavRMC',
-                   '/imu': 'sensor_msgs/msg/Imu'}
+                   '/imu': 'sensor_msgs/msg/Imu',
+                   '/bestutm': 'novatel_sensor_fusion/msg/NavUTM',
+                   '/bestxyz': 'novatel_sensor_fusion/msg/NavECEF'}
 
-    file_path = '/home/siyuchen/Documents/Novatel_Stereocam_Daten_20230703' \
-                '/20230703_140222/IMUData_20230703_140222.log'
+    # file_path = '/home/siyuchen/Documents/Novatel_Stereocam_Daten_20230703' \
+    #             '/20230703_140222/IMUData_20230703_140222.log'
 
     # file_path = '/home/siyuchen/catkin_ws/src/novatel_sensor_fusion' \
     #             '/jupyter_notebook/data/small_raw_imu_data.txt'
@@ -365,21 +459,19 @@ def main(args=None):
     #
     # SETINSTRANSLATION ANT1 0.431 0.0 0.013 0.001 0.001 0.001 VEHICLE
     # SETINSTRANSLATION ANT2 -0.506 0.0 0.013 0.001 0.001 0.001 VEHICLE
+    # dx = 0.431
+    # dy = 0.0
+    # dz = -0.013
 
-    dx = 0.431
-    dy = 0.0
-    dz = -0.013
-
-    # Since the vehicle body frame is the default output frame if it is set
-    # thus the translation from vehicle body frame to the antenna 1 is preferred
-    translation = [dx, -dy, -dz]
+    # # Since the vehicle body frame is the default output frame if it is set
+    # # thus the translation from vehicle body frame to the antenna 1 is preferred
+    # translation = [dx, -dy, -dz]
 
     recorder = ImuRawDataBagRecorder(
         topic_infos=topic_infos,
         # raw_data_file_path=file_path,
         # bag_name=rosbag_name,
         imu_data_rate=imu_data_rate,
-        translation=translation,
         ignore=False
     )
 

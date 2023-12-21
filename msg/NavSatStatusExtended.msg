@@ -1,3 +1,4 @@
+# deprecated message type, used only in deprecated messages
 std_msgs/Header header
 float64 latitude
 float64 longitude

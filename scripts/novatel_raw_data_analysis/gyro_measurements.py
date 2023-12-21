@@ -1,14 +1,25 @@
+import argparse
 from gps_time import GPSTime
 import matplotlib.pyplot as plt
 from novatel_sensor_fusion_py.ultilies.quaternion_multiply import quaternion_multiply
 import numpy as np
+import os
+from pathlib import Path
 
+
+abs_path = Path(os.path.abspath(__file__))
+parser = argparse.ArgumentParser(description="Check gyroscope measurement with ground truth")
+parser.add_argument("--folder-path", type=str,
+                    default=str(abs_path.parent.parent.parent / 'data/gnss_imu_logs/determine_gnss_pos'))
+parser.add_argument("--file-name", type=str,
+                    default='Rotation um Antenne1_2023-07-03_14-36-08.log')
+
+# Parse the arguments
+args = parser.parse_args()
+folder_path = args.folder_path
+file_name = args.file_name
 
 imu_data_rate = 100
-# folder_path = "/home/siyuchen/Documents/Novatel_Stereocam_Daten_20230703/20230703_140222/"
-# file_name = "IMUData_20230703_140222.log"
-folder_path = '/home/siyuchen/Documents/Novatel_Stereocam_Daten_20230703/'
-file_name = 'Rotation um Antenne1_2023-07-03_14-36-08.log'
 
 ref_gps_week = 2269
 ref_gps_after_week_sec = 131786.240000000
@@ -26,7 +37,7 @@ gyro_list = np.zeros((nb, 3))
 q_list.fill(np.nan)
 gyro_list.fill(np.nan)
 
-with open(folder_path + file_name) as data_file:
+with open(Path(folder_path) / file_name) as data_file:
     content = data_file.read().split('\n')
     for line in content:
         if 'CORRIMUSA' in line:
@@ -155,8 +166,8 @@ axs[0].plot(q_error2, label='Inner Product of Unit Quaternions')
 axs[0].set_title('Rotation estimation using Gyroscope Measurements vs. Sensor Output')
 axs[0].set_xlabel('Measurement count')
 axs[0].set_ylabel('Error in degree')
+axs[0].legend()
 
 axs[1].plot(gap_list, '*', label='IMU update gap')
-axs[0].legend()
 axs[1].legend()
 plt.show()

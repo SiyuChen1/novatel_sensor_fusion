@@ -34,8 +34,8 @@ class GNSSIMUSubscriber(Node):
         self.get_logger().info(f'use gnss velocity {self.use_gnss_velocity}')
 
         self.ekf = ExtendedKalmanFilter16States(
-            imu_paras['imu_data_rate'], imu_paras['gyro_bias_instability'],
-            imu_paras['accelerometer_bias_instability'],
+            imu_paras['imu_data_rate'], imu_paras['gyro_rate_random_walk'],
+            imu_paras['accelerometer_acceleration_random_walk'],
             imu_paras['angular_random_walk'],
             imu_paras['velocity_random_walk'],
             init_state_covariance=init_state_covariance * np.eye(16),
@@ -199,7 +199,15 @@ def main(args=None):
                  # accelerometer_noise refers to velocity random walk in the datasheet
                  # https://docs.novatel.com/OEM7/Content/PDFs/CPT7_Installation_Operation_Manual.pdf
                  # page 179 table 29, with unit m/s per sqrt(hour)
-                 'velocity_random_walk': 0.06
+                 'velocity_random_walk': 0.06,
+
+                 # Gyroscope Rate Random Walk (rad/s^1.5), determined by allan variance
+                 # see imu_paras.md
+                 'gyro_rate_random_walk': 1.71e-7,
+
+                 # Accelerometer Acceleration Random Walk (m/s^2.5), determined by allan variance
+                 # see imu_paras.md
+                 'accelerometer_acceleration_random_walk': 1.56e-5
                  }
 
     subscriber = GNSSIMUSubscriber(imu_paras)

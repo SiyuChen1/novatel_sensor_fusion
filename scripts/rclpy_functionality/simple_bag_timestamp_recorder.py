@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+
+# this script shows that the order of writing ros messages doesn't affect the order of replaying rosbag
+# only the timestamp matters
 import rclpy
 from rclpy.duration import Duration
 from rclpy.node import Node
@@ -27,9 +31,8 @@ class SimpleBagRecorder(Node):
         start = self.get_clock().now()
 
         # the bigger msg.frame_id, the smaller msg.stamp
-        # the order of writing msg into rosbag doesn't affect
-        # the order replaying the rosbag data, only the timestamp
-        # used for writing the rosbag is related
+        # the order of writing msg into rosbag doesn't affect the order when replaying the rosbag data,
+        # only the timestamp used for writing the rosbag is related
 
         # msg with smaller frame_id but bigger timestamp will be written
         # into rosbag file firstly.

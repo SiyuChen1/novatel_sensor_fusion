@@ -1,3 +1,4 @@
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -9,13 +10,16 @@ from rclpy.serialization import deserialize_message
 import rosbag2_py
 
 
-def convert_to_seconds(time):
-    return time.sec + time.nanosec / 1e9
-
+parser = argparse.ArgumentParser(description="Visualizing LLA")
+parser.add_argument("--bag-file-path", type=str,
+                    default='/home/siyuchen/catkin_ws/imu_raw_data_bag_recorder/imu_raw_data_bag_recorder_0.mcap')
 
 # Path to the bag file
-bag_file_path = '/home/siyuchen/catkin_ws/' \
-                'imu_raw_data_bag_recorder/imu_raw_data_bag_recorder_0.mcap'
+# bag_file_path = '/home/siyuchen/catkin_ws/' \
+#                 'imu_raw_data_bag_recorder/imu_raw_data_bag_recorder_0.mcap'
+# Parse the arguments
+args = parser.parse_args()
+bag_file_path = args.bag_file_path
 
 # Create a reader
 reader = rosbag2_py.SequentialReader()
@@ -23,7 +27,6 @@ reader = rosbag2_py.SequentialReader()
 # Open the bag file
 storage_options = rosbag2_py.StorageOptions(uri=bag_file_path, storage_id='mcap')
 reader.open(storage_options, rosbag2_py.ConverterOptions())
-
 
 # # Iterate through messages
 # for topic_metadata in reader.get_all_topics_and_types():
@@ -34,6 +37,8 @@ gpgga = []
 gpggalong = []
 best = []
 bestgnss = []
+bestutm = []
+bestxyz = []
 
 # Read messages
 while reader.has_next():
@@ -56,6 +61,10 @@ while reader.has_next():
         case '/bestgnss':
             msg = deserialize_message(msg_bytes, NavSatExtended)
             bestgnss.append([ts, msg.latitude, msg.longitude, msg.altitude])
+        case '/bestutm':
+            msg = deserialize_message(msg_bytes, NavSat)
+            bestutm.append([ts, msg.latitude, msg.longitude, msg.altitude])
+
 
 # Close the reader
 del reader
@@ -126,8 +135,8 @@ print(best_enu.shape)
 axs[2].plot(gprmc_enu[0, :], gprmc_enu[1, :], '+', label='GPRMC')
 axs[2].plot(gpgga_enu[0, :], gpgga_enu[1, :], '*', label='GPGGA')
 axs[2].plot(gpggalong_enu[0, :], gpggalong_enu[1, :], 'x', label='GPGGALong')
-axs[2].set_xlabel('X')
-axs[2].set_ylabel('Y')
+axs[2].set_xlabel('East m')
+axs[2].set_ylabel('North m')
 axs[2].ticklabel_format(useOffset=False)
 plt.legend()
 plt.show()
@@ -164,13 +173,6 @@ print('distance between bestgnss and gpggalong in meter',
                                         )
       )
 
-print('distance between best and gpggalong in meter',
-      compute_rmse_between_trajectories(t_a=gpggalong[:, 0],
-                                        t_b=best[:, 0],
-                                        trajectory_a=gpggalong_enu,
-                                        trajectory_b=best_enu
-                                        )
-      )
 
 print('distance between bestgnss and best in meter',
       compute_rmse_between_trajectories(t_a=best[:, 0],
@@ -189,6 +191,7 @@ ax.set_xlabel('East')
 ax.set_ylabel('North')
 ax.set_zlabel('Up')
 ax.legend()
+
 # ax.plot3D(bestgnss_enu[0, :], bestgnss_enu[1, :], bestgnss_enu[2, :], 'red')
 
 plt.show()

@@ -1,3 +1,4 @@
+# Check rotation between IMU body and vehicle frame
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
@@ -50,19 +51,23 @@ with open(raw_imu_path, 'r') as file:
                 imu_ts.append(accelerometer_factor * float(data[3]) * freq)
                 imu_ts.append(-accelerometer_factor * float(data[4]) * freq)
                 imu_ts.append(accelerometer_factor * float(data[5]) * freq)
-                # acceleration with order Z, Y, X
+                # gyroscope with order Z, Y, X
                 imu_ts.append(gyroscope_factor * float(data[6]) * freq)
                 imu_ts.append(-gyroscope_factor * float(data[7]) * freq)
                 imu_ts.append(gyroscope_factor * float(data[8].split('*')[0]) * freq)
 
                 raw_imu_ts_array.append(imu_ts)
 
-            if raw_imu_count % 20000 == 0:
+            if raw_imu_count % 80000 == 0:
                 print(f"{raw_imu_count} raw imu data have been processed")
         elif line.strip() and 'CORRIMUSA' in line:
             # This log is not output in the IMU Body frame, but in the vehicle body frame. on page 1100
-            # Set by SETINSROTATION RBV 180 0 0. See Novatel_20231201_IMU_Calibration.txt
+            # Set by SETINSROTATION RBV 180 0 -90. See Novatel_20231201_IMU_Calibration.txt
             # Splitting the line by spaces and converting the parts to floats
+
+            # Let the measurement in the vehicle body frame be [xb, yb, zb]. After rotation with
+            # "SETINSROTATION RBV 180 0 -90", the measurement in the IMU body frame should be
+            # [xi, yi, zi] = [-yb, -xb, -zb].
             parts = line.split(';')
             data = parts[1].rstrip().split(',')
             header = parts[0].rstrip().split(',')
@@ -80,24 +85,25 @@ with open(raw_imu_path, 'r') as file:
                 imu_ts.append(100 * (current_time - start_time))
 
                 # acceleration
-                # firstly in Z, factor -1 because of rotation between IMU body and vehicle frame
+                # accelerations along x, y and z axis are data[4], data[5], data[6]
+                # firstly in Z, zi = -zb
                 imu_ts.append(- 1 / imu_data_count * float(data[6]) * freq)
-                # then in Y, factor -1 because of rotation between IMU body and vehicle frame
+                # then in Y, yi = -xb
+                imu_ts.append(- 1 / imu_data_count * float(data[4]) * freq)
+                # at last in X, xi = -yb
                 imu_ts.append(- 1 / imu_data_count * float(data[5]) * freq)
-                # at last in X
-                imu_ts.append(1 / imu_data_count * float(data[4]) * freq)
 
                 # angular velocity
-                # firstly in Z, factor -1 because of rotation between IMU body and vehicle frame
+                # firstly in Z, zi = -zb
                 imu_ts.append(- 1 / imu_data_count * float(data[3]) * freq)
-                # then in Y, factor -1 because of rotation between IMU body and vehicle frame
+                # then in Y, yi = -xb
+                imu_ts.append(- 1 / imu_data_count * float(data[1]) * freq)
+                # at last in X, xi = -yb
                 imu_ts.append(- 1 / imu_data_count * float(data[2]) * freq)
-                # at last in X
-                imu_ts.append(1 / imu_data_count * float(data[1]) * freq)
 
                 correct_imu_ts_array.append(imu_ts)
 
-            if correct_imu_count % 20000 == 0:
+            if correct_imu_count % 80000 == 0:
                 print(f"{correct_imu_count} correct imu data have been processed")
 
 print("correct_imu_count/raw_imu_count", correct_imu_count, "/", raw_imu_count)
@@ -129,41 +135,41 @@ filtered_cor_imu = cor_imu_ts_array_np[
 print(filtered_cor_imu.shape)
 print(filtered_raw_imu.shape)
 
-print(filtered_raw_imu[-1], filtered_cor_imu[-1])
-
-g = filtered_cor_imu[:, 1:4] + filtered_raw_imu[:, 1:4]
-t_diff = filtered_cor_imu[:, 0] - filtered_raw_imu[:, 0]
+g = -filtered_cor_imu[:, 1:4] + filtered_raw_imu[:, 1:4]
+t_diff = 1 / 100 * (filtered_cor_imu[:, 0] - filtered_raw_imu[:, 0])
+t = 1 / 100 * filtered_raw_imu[:, 0]
+print(np.linalg.norm(g[0:10, :], axis=1))
 
 # Creating the figure
 plt.figure(figsize=(15, 10))
 
 # First Row: Acceleration Plots
 plt.subplot(2, 3, 1)  # 2 rows, 3 columns, 1st subplot
-plt.plot(filtered_raw_imu[:, 3], color='r')
-plt.plot(filtered_cor_imu[:, 3], color='g')
+plt.plot(t, filtered_raw_imu[:, 3], color='r')
+plt.plot(t, filtered_cor_imu[:, 3], color='g')
 plt.title('Acceleration in X')
 plt.xlabel('Time (s)')
 plt.ylabel('Acc X')
 
 plt.subplot(2, 3, 2)  # 2 rows, 3 columns, 2nd subplot
-plt.plot(filtered_raw_imu[:, 2], color='r')
-plt.plot(filtered_cor_imu[:, 2], color='g')
+plt.plot(t, filtered_raw_imu[:, 2], color='r')
+plt.plot(t, filtered_cor_imu[:, 2], color='g')
 plt.title('Acceleration in Y')
 plt.xlabel('Time (s)')
 plt.ylabel('Acc Y')
 
 plt.subplot(2, 3, 3)  # 2 rows, 3 columns, 3rd subplot
-plt.plot(filtered_raw_imu[:, 1], color='r')
-plt.plot(filtered_cor_imu[:, 1], color='g')
+plt.plot(t, filtered_raw_imu[:, 1], color='r')
+plt.plot(t, filtered_cor_imu[:, 1], color='g')
 plt.title('Acceleration in Z')
 plt.xlabel('Time (s)')
 plt.ylabel('Acc Z')
 
 plt.subplot(2, 1, 2)  # 2 rows, 3 columns, 3rd subplot
-plt.plot(1 / 100 * filtered_cor_imu[:, 0], np.linalg.norm(g, axis=1))
+plt.plot(t, np.linalg.norm(g, axis=1))
 plt.xlabel('Time (s)')
 plt.ylabel('Acceleration (m/s^2)')
-# plt.plot(t_diff)
+# plt.plot(t, t_diff)
 
 # Display the plots
 plt.tight_layout()

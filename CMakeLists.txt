@@ -24,6 +24,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/NavRMC.msg"
   "msg/NavSat.msg"
   "msg/NavSatExtended.msg"
+  "msg/NavECEF.msg"
+  "msg/NavUTM.msg"
   DEPENDENCIES builtin_interfaces geometry_msgs std_msgs
   ADD_LINTER_TESTS
  )
@@ -126,3 +128,5 @@ if(BUILD_TESTING)
 endif()
 
 ament_package()
+
+# colcon build --packages-select

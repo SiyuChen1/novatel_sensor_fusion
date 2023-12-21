@@ -1,6 +1,7 @@
 import numpy as np
 import transforms3d
 
+# samples from imu raw data
 angle_y = 0.105304289
 angle_x = 2.745404166
 azimuth = 182.376753587
@@ -20,7 +21,7 @@ print(transforms3d.axangles.mat2axangle(M))
 ax = float(angle_x) * np.pi / 180
 ay = float(angle_y) * np.pi / 180
 az = - float(azimuth) * np.pi / 180
-# Quaternion in w, x, y z (real, then vector) format
+# Quaternion in w, x, y, z (real, then vector) format
 q_t = transforms3d.euler.euler2quat(ay, ax, az, 'syxz')
 M_t = transforms3d.quaternions.quat2mat(q_t)
 print(transforms3d.axangles.mat2axangle(M_t))
