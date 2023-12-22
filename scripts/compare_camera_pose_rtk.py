@@ -183,9 +183,9 @@ def get_gps_imu_data(abs_path, file_name):
 
 dataset_dir = Path('/home/siyuchen/Downloads/data/dataset/rivercloud_dataset/20231031/20231031_105114')
 slam_method = 'orb3'
-# experiment_timestamp = '231207_130517'
+experiment_timestamp = '231207_130517'
 # experiment_timestamp = '231208_151051'
-experiment_timestamp = '231207_151626'
+# experiment_timestamp = '231207_151626'
 
 # read start_id used in slam
 start_id = None
