@@ -66,8 +66,8 @@ class ImuRawDataBagRecorder(Node):
         rotation_imu_vehicle_angles = \
             self.get_parameter('rotation_imu_vehicle').get_parameter_value().double_array_value.tolist()
 
-        self.get_logger().info(str(type(translation_imu_antenna1)))
-        self.get_logger().info(str(type(rotation_imu_vehicle_angles)))
+        # self.get_logger().info(str(type(translation_imu_antenna1)))
+        # self.get_logger().info(str(type(rotation_imu_vehicle_angles)))
 
         # raw_data_file_path = '/home/siyuchen/Downloads/data/dataset/rivercloud_dataset/20231031/20231031_105114/IMUData_20231031_105114.log'
         # ros2bag_name = '20231031_105114_Blausteinsee'
@@ -120,13 +120,11 @@ class ImuRawDataBagRecorder(Node):
         parsed_data_df = imu_data_df.apply(parse_line, axis=1, args=(year, month, day)).dropna()
 
         # Grouping the data by GPS time
-        self.parsed_data_df = list(parsed_data_df.groupby('gps_time'))
+        self.grouped_data_df = list(parsed_data_df.groupby('gps_time'))
 
         if ignore:
-            delete_index = len(self.parsed_data_df) * 0.10
-            del self.parsed_data_df[0: int(delete_index)]
-        else:
-            self.grouped_data_df = parsed_data_df
+            delete_index = len(self.grouped_data_df) * 0.10
+            del self.grouped_data_df[0: int(delete_index)]
 
     def write_data_to_bag(self):
         # Assumption: the coordinate system of the antenna 1 is not well-defined.
@@ -155,8 +153,6 @@ class ImuRawDataBagRecorder(Node):
         only_bestvel = 0
         only_bestgnss = 0
         only_bestgnssvel = 0
-        for indx in range(len(self.parsed_data_df)):
-            data = self.parsed_data_df[indx]
         for indx in range(len(self.grouped_data_df)):
             data = self.grouped_data_df[indx]
             gps_time_str = data[0].split(',')

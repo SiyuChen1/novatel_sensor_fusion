@@ -30,6 +30,10 @@ print(orb.getScaleFactor())
 for i in range(1):
     img = cv2.imread('images/image{}.png'.format(i))
     if img is not None:
+        # In OpenCV, when you detect keypoints using feature detectors like SIFT, ORB,
+        # or others that employ an image pyramid, the coordinates (x, y) of
+        # the detected key points are typically given in the coordinate system of
+        # the original image scale, not the scaled images in the image pyramid.
         keypoints, descriptors = orb.detectAndCompute(img, None)
         assert len(keypoints) == len(descriptors)
         print(descriptors.shape if descriptors is not None else "No descriptors")

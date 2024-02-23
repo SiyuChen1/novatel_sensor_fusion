@@ -9,6 +9,7 @@ import pymap3d as pm
 from scipy.spatial.transform import Rotation as R
 from gps_time import GPSTime
 from novatel_sensor_fusion_py.lla2geodetic.lla2geodetic import lla2enu
+import pandas as pd
 
 
 class Vector3D:
@@ -98,6 +99,7 @@ def get_gps_imu_data(abs_path, file_name):
     quaternion_with_timestamp = []
     imu_with_timestamp = []
     imu_data_rate = 100
+    gps_week = None
     with open(abs_path / file_name) as data_file:
         content = data_file.read().split('\n')
         for index, line in enumerate(content):
@@ -178,14 +180,40 @@ def get_gps_imu_data(abs_path, file_name):
 
     return lla_with_timestamp,\
         quaternion_with_timestamp, \
-        imu_with_timestamp
+        imu_with_timestamp, \
+        gps_week
 
 
-dataset_dir = Path('/home/siyuchen/Downloads/data/dataset/rivercloud_dataset/20231031/20231031_105114')
+tf_vehicle_ant1 = np.zeros((4, 4))
+# translation from vehicle body to antenna 1 in mm
+# in the configuration file, the translation from IMU body to antenna 1 is given
+# thus we have to transform the translation by ourselves
+# for example, see Novatel_20240213_Stereo.txt
+# SETINSTRANSLATION ANT1 -0.057 0.531 -0.229 0.001 0.001 0.001 IMUBODY
+# SETINSTRANSLATION ANT2 -0.087 -0.515 -0.264 0.001 0.001 0.001 IMUBODY
+# SETINSROTATION RBV 180 0 -90
+Rot_imu_vehicle = R.from_euler('ZXY', [-90, 180, 0], degrees=True).as_matrix()
+translation_imu_ant1 = np.array([-0.057, 0.531, -0.2290])
+print("translation from IMU to antenna 1: ", translation_imu_ant1)
+tf_vehicle_ant1[0:3, 3] = Rot_imu_vehicle @ translation_imu_ant1
+print("translation from vehicle to antenna 1: ", tf_vehicle_ant1[0:3, 3])
+
+# dataset_dir = Path('/home/siyuchen/Downloads/data/dataset/rivercloud_dataset/20240213/20240213_112238/')
+# slam_method = 'orb3'
+# # experiment_timestamp = '240222_152334'
+# # experiment_timestamp = '240222_153021'
+# # experiment_timestamp = '240222_154342'
+# # experiment_timestamp = '240222_155031'
+# experiment_timestamp = '240222_161150'
+
+dataset_dir = Path('/home/siyuchen/Downloads/data/dataset/rivercloud_dataset/20240213/20240213_113334/')
 slam_method = 'orb3'
-experiment_timestamp = '231207_130517'
-# experiment_timestamp = '231208_151051'
-# experiment_timestamp = '231207_151626'
+# experiment_timestamp = '240223_092550'
+experiment_timestamp = '240223_092904'
+
+# dataset_dir = Path('/home/siyuchen/Downloads/data/dataset/rivercloud_dataset/20240213/20240213_115130/')
+# slam_method = 'orb3'
+# experiment_timestamp = '240223_094643'
 
 # read start_id used in slam
 start_id = None
@@ -195,18 +223,17 @@ with open(dataset_dir / 'slam' / slam_method / experiment_timestamp / 'start_id.
 
 print("start_id used in VSLAM:", start_id)
 
-
 # read IMU and GPS data
-imu_file_name = 'IMUData_20231031_105114.log'
+imu_file_name = f'IMUData_{dataset_dir.parts[-1]}.log'
 lla_with_timestamp, quaternion_with_timestamp, \
-    imu_with_timestamp = get_gps_imu_data(dataset_dir, imu_file_name)
+    imu_with_timestamp, gps_week = get_gps_imu_data(dataset_dir, imu_file_name)
 
 lla_list = np.array([lla_msg.lla_with_std for lla_msg in lla_with_timestamp])
 time_stamp_list = np.array([lla_msg.time_stamp for lla_msg in lla_with_timestamp])
 quaternion_with_timestamp = np.array(quaternion_with_timestamp)
 
 # read camera timestamp
-camera_timestamp_name = 'Stereocam_20231031_105114.log'
+camera_timestamp_name = f'Stereocam_{dataset_dir.parts[-1]}.log'
 camera_timestamp = read_camera_timestamp(dataset_dir / camera_timestamp_name)
 # print('camera_timestamp.shape', camera_timestamp.shape)
 assert camera_timestamp[0]['id'] <= start_id
@@ -214,8 +241,7 @@ assert camera_timestamp[0]['id'] <= start_id
 ref_id = int(start_id - camera_timestamp[0]['id'])
 # select reference time stamp
 ref_time_gps_seconds = camera_timestamp[ref_id]['desired_ts']
-# print("ref_time_gps_seconds:", float(ref_time_gps_seconds))
-gps_week = 2286
+print("ref_time_gps_seconds:", float(ref_time_gps_seconds))
 ref_camera_posix_time = gps_time_to_posix_time(gps_week, ref_time_gps_seconds)
 print('reference camera timestamp:', ref_camera_posix_time)
 
@@ -236,6 +262,8 @@ desired_tol = 1 / freq_IMU / 2
 ref_lla_time_id = np.where(np.abs(time_stamp_list - ref_camera_posix_time) < desired_tol)
 ref_q_time_id = np.where(np.abs(quaternion_with_timestamp[:, 0] - ref_camera_posix_time) < desired_tol)
 
+# print(time_stamp_list)
+
 assert ref_lla_time_id[0].size == 1
 assert ref_q_time_id[0].size == 1
 
@@ -243,6 +271,8 @@ ref_lla_time_id = ref_lla_time_id[0][0]
 ref_q_time_id = ref_q_time_id[0][0]
 
 lla_ref = lla_list[ref_lla_time_id, 0:3]
+
+print("reference lla:", lla_ref[0], lla_ref[1], lla_ref[2])
 
 np.set_printoptions(suppress=True)
 print("reference lla timestamp:", time_stamp_list[ref_lla_time_id])
@@ -262,21 +292,19 @@ camera_traj = read_camera_trajectory(camera_pose_path)
 # print(np.max(camera_traj[:, 2, 3]))
 # print("camera_traj.shape", camera_traj.shape)
 
+print(camera_timestamp[-1]['id'], start_id + camera_traj.shape[0])
 # assert camera_timestamp[-1]['id'] == start_id + camera_traj.shape[0]
 
-tf_imu_ant1 = np.zeros((4, 4))
 # ref_q with [w, x, y, z] but R.from_quat requires [x, y, z, w]
-rotation_ant1_imu = R.from_quat([ref_q[1], ref_q[2], ref_q[3], ref_q[0]])
-tf_imu_ant1[0:3, 0:3] = rotation_ant1_imu.as_matrix().T
-# translation in mm, see email on 20.11.2023 at 15:30 from Effkemann
-tf_imu_ant1[0:3, 3] = [-530.6, 65.4, 226.0]
-tf_imu_ant1[0:3, 3] = 1 / 1e3 * tf_imu_ant1[0:3, 3]
-# print("tf_imu_ant1:", tf_imu_ant1)
+rotation_ant1_vehicle = R.from_quat([ref_q[1], ref_q[2], ref_q[3], ref_q[0]])
+tf_vehicle_ant1[0:3, 0:3] = rotation_ant1_vehicle.as_matrix().T
+# print("tf_vehicle_ant1:", tf_vehicle_ant1)
 
-tf_ant1_imu = np.zeros((4, 4))
-tf_ant1_imu[0:3, 0:3] = rotation_ant1_imu.as_matrix()
-tf_ant1_imu[0:3, 3] = -rotation_ant1_imu.as_matrix() @ tf_imu_ant1[0:3, 3]
+tf_ant1_vehicle = np.zeros((4, 4))
+tf_ant1_vehicle[0:3, 0:3] = rotation_ant1_vehicle.as_matrix()
+tf_ant1_vehicle[0:3, 3] = -rotation_ant1_vehicle.as_matrix() @ tf_vehicle_ant1[0:3, 3]
 
+# not clear, waiting for Christoph Effkemann 21.02.2024
 # from imu to left camera
 imu_cam_left = np.zeros((3, 3))
 imu_cam_left[:, 0] = [0.999258, 0.000897, 0.038500]
@@ -290,18 +318,55 @@ tf_imu_cam_left[3, 3] = 1
 
 tf_cam_left_vslam = np.diag([1, -1, -1, 1])
 
-tf_ant1_cam_left = tf_ant1_imu @ tf_imu_cam_left @ tf_cam_left_vslam
+tf_ant1_cam_left = tf_ant1_vehicle @ tf_imu_cam_left @ tf_cam_left_vslam
 
 camera_traj_in_ant1 = np.einsum('ij,kjl->kil', tf_ant1_cam_left, camera_traj)
 camera_traj_len = camera_traj_in_ant1.shape[0]
 # print(camera_traj_in_ant1.shape)
 
+camera_end_id = ref_id + camera_traj_len - 1
+print(ref_id, camera_end_id)
+camera_end_time = gps_time_to_posix_time(gps_week, camera_timestamp[camera_end_id]['desired_ts'])
+lla_end_id = np.where(np.abs(time_stamp_list - camera_end_time) < desired_tol)
+print(time_stamp_list[-1], camera_end_time)
+assert lla_end_id[0].size == 1
+lla_end_id = lla_end_id[0][0]
+
+time_meas = np.array(time_stamp_list[ref_lla_time_id:lla_end_id+1] - time_stamp_list[ref_lla_time_id])
+
+# drone_trajectory_path = dataset_dir / f'{dataset_dir.parts[-1]}_Tracking_diff_FloatingCorr.log'
+drone_trajectory_path = dataset_dir / f'{dataset_dir.parts[-1]}_Tracking_ohne_Korrektur.log'
+
+# Reading the file
+df = pd.read_csv(drone_trajectory_path, delim_whitespace=True)
+drone_image_time_list = df['time'].tolist()
+drone_image_posix_time_list = np.array([gps_time_to_posix_time(gps_week, sec)
+                               for sec in drone_image_time_list])
+drone_start_id = np.where(drone_image_posix_time_list > time_stamp_list[ref_lla_time_id])[0][0]
+drone_end_id = np.where(drone_image_posix_time_list > camera_end_time)[0][0]
+drone_enu = lla2enu(df['Latitude'].values,
+                    df['Longitude'].values,
+                    df['Elevation'].values,
+                    lla_ref[0],
+                    lla_ref[1],
+                    lla_ref[2],
+                    degrees=True)
+print("Drone:", drone_end_id - drone_start_id)
+print("VSLAM:", camera_traj_in_ant1.shape[0])
+print("GNSS:", lla_end_id - ref_lla_time_id)
+
 # Create a 2x3 grid for subplots
 gs = gridspec.GridSpec(3, 6)
 
 ax0 = plt.subplot(gs[0, 0:2])
-ax0.plot(enu[0, :], enu[1, :], label="RTK")
+# ax0.plot(enu[0, :], enu[1, :], label="RTK")
+ax0.plot(enu[0, ref_lla_time_id:lla_end_id+1], enu[1, ref_lla_time_id:lla_end_id+1], label="RTK")
+ax0.plot(enu[0, ref_lla_time_id], enu[1, ref_lla_time_id], '*', label="START")
+# ax0.plot(enu[0, 7000], enu[1, 7000], '*', label="TEMP")
+ax0.plot(enu[0, lla_end_id], enu[1, lla_end_id], '+', label='END')
+# ax0.plot(enu[0, ref_lla_time_id:lla_end_id + 1], enu[1, ref_lla_time_id:lla_end_id+1], label="GROUND TRUTH")
 ax0.plot(camera_traj_in_ant1[:, 0, 3], camera_traj_in_ant1[:, 1, 3], label="VSLAM")
+ax0.plot(drone_enu[0, drone_start_id:drone_end_id], drone_enu[1, drone_start_id:drone_end_id], label="Drone")
 ax0.axis('equal')
 ax0.set_xlabel('East m')
 ax0.set_ylabel('North m')
@@ -334,19 +399,13 @@ ax3.set_ylabel('Standard Deviation m')
 ax3.set_title('Standard Deviation of Latitude, Longitude and Altitude, RTK Measurements')
 ax3.legend()
 
-camera_end_id = ref_id + camera_traj_len - 1
-camera_end_time = gps_time_to_posix_time(gps_week, camera_timestamp[camera_end_id]['desired_ts'])
-lla_end_id = np.where(np.abs(time_stamp_list - camera_end_time) < desired_tol)
-assert lla_end_id[0].size == 1
-lla_end_id = lla_end_id[0][0]
-
-time_meas = np.array(time_stamp_list[ref_lla_time_id:lla_end_id+1] - time_stamp_list[ref_lla_time_id])
-
+drone_rel_time = drone_image_posix_time_list - time_stamp_list[ref_lla_time_id]
 ax4 = plt.subplot(gs[2, 0])
 ax4.plot(time_meas,
          enu[0, ref_lla_time_id:lla_end_id + 1], label='RTK in East')
 ax4.plot(time_meas,
          camera_traj_in_ant1[:, 0, 3], label='VSLAM in East')
+ax4.plot(drone_rel_time[drone_start_id:drone_end_id], drone_enu[0, drone_start_id:drone_end_id], label="Drone in North")
 ax4.set_xlabel('Time s')
 ax4.set_xlim(left=0)
 ax4.set_ylabel('Meter m')
@@ -356,6 +415,7 @@ ax4.set_title('RTK vs. VSLAM in East')
 ax5 = plt.subplot(gs[2, 1])
 dif_east = np.array(camera_traj_in_ant1[:, 0, 3]) - np.array(enu[0, ref_lla_time_id:lla_end_id + 1])
 ax5.plot(time_meas, np.abs(dif_east), 'g--', label="difference")
+
 ax5.legend()
 
 ax6 = plt.subplot(gs[2, 2])
@@ -402,6 +462,11 @@ plt.subplots_adjust(left=0.1,
                     hspace=0.4)
 
 plt.show()
+
+# # Define the standard deviation profile
+# x = np.linspace(-3, 3, 100)  # Range for the Gaussian function
+# sigma_profile = np.exp(-x**2 / 1)  # Gaussian function for standard deviation
+# print(sigma_profile)
 
 # # read configuration file
 # config_name = 'Novatel_20231024_Stereo.txt'

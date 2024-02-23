@@ -1,0 +1,12 @@
+Log         Total       Valid       Criteria    
+CORRIMU     99157       99157       Not all IMU data close to 0
+INSATTQ     99223       99223       INS_SOLUTION_GOOD
+BESTGNSSVEL 9898        7587        SOL_COMPUTED & NARROW_INT
+BESTGNSSPOS 0           0           SOL_COMPUTED & NARROW_INT
+BESTVEL     9884        7574        SOL_COMPUTED & INS_RTKFIXED
+BESTPOS     9888        7578        SOL_COMPUTED & INS_RTKFIXED
+BESTXYZ     9882        7572        SOL_COMPUTED & INS_RTKFIXED
+BESTUTM     9882        7572        SOL_COMPUTED & INS_RTKFIXED
+GPRMC       988         988         POS STATUS == A means valid
+GPGGA       1976        1514        GPS Quality == 4 means RTK_FIXED
+RAWIMU(S)   99071       99071       RAWIMU NO CHECKING
