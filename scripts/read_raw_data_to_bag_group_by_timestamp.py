@@ -98,13 +98,17 @@ class ImuRawDataBagRecorder(Node):
 
         self.imu_data_rate = imu_data_rate
 
-        # the translation from vehicle body frame (if it is set, then it is the default output frame)
-        # to the antenna1
-        # P(imu->antenna1) = T(imu->vehicle) + R(imu->vehicle) @ P(vehicle->antenna1)
-        # thus, P(vehicle->antenna1) = inv(R(imu->vehicle)) @ (P(imu->antenna1) - T(imu->vehicle))
-        # Since T(imu->vehicle) = [0, 0, 0]
-        # P(vehicle->antenna1) = inv(R(imu->vehicle)) @ P(imu->antenna1)
-        rotation_imu_vehicle = R.from_euler('zxy', rotation_imu_vehicle_angles, degrees=True).as_matrix()
+        # # the translation from vehicle body frame (if it is set, then it is the default output frame)
+        # # to the antenna1
+        # # P(imu->antenna1) = T(imu->vehicle) + R(imu->vehicle) @ P(vehicle->antenna1)
+        # # thus, P(vehicle->antenna1) = inv(R(imu->vehicle)) @ (P(imu->antenna1) - T(imu->vehicle))
+        # # Since T(imu->vehicle) = [0, 0, 0]
+        # # P(vehicle->antenna1) = inv(R(imu->vehicle)) @ P(imu->antenna1)
+        # rotation_imu_vehicle = R.from_euler('zxy', rotation_imu_vehicle_angles, degrees=True).as_matrix()
+        
+        # need to be double checked, found on 28.11.2024
+        rotation_imu_vehicle = R.from_euler('ZXY', rotation_imu_vehicle_angles, degrees=True).as_matrix()
+
         self.translation_vehicle_antenna1 = np.linalg.inv(rotation_imu_vehicle) @ translation_imu_antenna1
 
         # Reading the data into a DataFrame

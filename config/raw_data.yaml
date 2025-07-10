@@ -12,10 +12,12 @@
       - -0.229
     # rotation from IMU body frame to the output frame, i.e. vehicle frame.
     # Angles are given in degree. The order of rotations is Z, X, Y. All rotations are right-handed.
+    # see https://docs.novatel.com/OEM7/Content/PDFs/OEM7_Commands_Logs_Manual.pdf page 1036 section 4.22
     # Rotation is extrinsic rotation, with fixed coordinate system.
     # e.g. SETINSROTATION RBV 180 0 -90
     # ax = 180, ay = 0, az = -90, unit is degree
+    # but the correct rotation order is ZXY, so the values should be listed in this order
     rotation_imu_vehicle:
+      - -90.
       - 180.
       - 0.
-      - 90.

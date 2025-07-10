@@ -1,5 +1,4 @@
 import re
-import sys
 import math
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -110,6 +109,7 @@ def get_gps_imu_data(abs_path, file_name):
                 gps_week = int(header[5])
                 seconds_in_week = float(header[6])
                 current_posix_time = gps_time_to_posix_time(gps_week, seconds_in_week)
+                #print(current_posix_time, gps_week, seconds_in_week)
 
                 data = msg[1].split(',')
 
@@ -135,7 +135,13 @@ def get_gps_imu_data(abs_path, file_name):
                 lla_with_timestamp.append(lla_msg)
 
             if 'INSATTQSA' in line:
-                # rotation from enu frame to vehicle frame
+                # rotation from enu frame to vehicle frame given in quaternion form
+                # see https://docs.novatel.com/OEM7/Content/PDFs/OEM7_Commands_Logs_Manual.pdf
+                # page 1074, 5.13 INSATT
+                # By default, the output attitude is with respect to the vehicle frame. 
+                # If the attitude output is desired with respect to another frame of reference,
+                # use the SETINSROTATION USER command (see the SETINSROTATION command on page 1036) to configure 
+                # the user output frame offset rotation.
                 msg = line.split(';')
                 data = msg[1].split(',')
                 gps_week = int(data[0])
@@ -150,6 +156,11 @@ def get_gps_imu_data(abs_path, file_name):
                 quaternion_with_timestamp.append([current_posix_time, w, x, y, z])
 
             if 'CORRIMUSA' in line:
+                # # The CORRIMUS log contains the raw IMU data corrected for gravity,
+                # # the earth’s rotation and estimated sensor errors.
+                # # Data output is not in the IMU Body frame, but is automatically rotated 
+                # # into the user configured output frame (configured with the SETINSROTATION command 
+                # # (see page 1036), default is Vehicle frame).
                 msg = line.split(';')
                 header = msg[0].split(',')
                 data = msg[1].split(',')
@@ -185,6 +196,8 @@ def get_gps_imu_data(abs_path, file_name):
 
 
 tf_vehicle_ant1 = np.zeros((4, 4))
+# # don't forget to set this value
+tf_vehicle_ant1[3, 3] = 1
 # translation from vehicle body to antenna 1 in mm
 # in the configuration file, the translation from IMU body to antenna 1 is given
 # thus we have to transform the translation by ourselves
@@ -192,28 +205,45 @@ tf_vehicle_ant1 = np.zeros((4, 4))
 # SETINSTRANSLATION ANT1 -0.057 0.531 -0.229 0.001 0.001 0.001 IMUBODY
 # SETINSTRANSLATION ANT2 -0.087 -0.515 -0.264 0.001 0.001 0.001 IMUBODY
 # SETINSROTATION RBV 180 0 -90
+# RBV means vehicle frame 
+# see https://docs.novatel.com/OEM7/Content/PDFs/CPT7_Installation_Operation_Manual.pdf page 94 section 4.3.6
 Rot_imu_vehicle = R.from_euler('ZXY', [-90, 180, 0], degrees=True).as_matrix()
 translation_imu_ant1 = np.array([-0.057, 0.531, -0.2290])
 print("translation from IMU to antenna 1: ", translation_imu_ant1)
-tf_vehicle_ant1[0:3, 3] = Rot_imu_vehicle @ translation_imu_ant1
+
+# # modified and corrected on 25.11.2024
+# # before it was
+# # tf_vehicle_ant1[0:3, 3] = Rot_imu_vehicle @ translation_imu_ant1
+# # since Rot_imu_vehicle = Rot_imu_vehicle.T, the caculation is correct
+# # but the correct one is Rot_imu_vehicle.T @ translation_imu_ant1
+
+tf_vehicle_ant1[0:3, 3] = Rot_imu_vehicle.T @ translation_imu_ant1
 print("translation from vehicle to antenna 1: ", tf_vehicle_ant1[0:3, 3])
 
-# dataset_dir = Path('/home/siyuchen/Downloads/data/dataset/rivercloud_dataset/20240213/20240213_112238/')
-# slam_method = 'orb3'
-# # experiment_timestamp = '240222_152334'
-# # experiment_timestamp = '240222_153021'
-# # experiment_timestamp = '240222_154342'
-# # experiment_timestamp = '240222_155031'
-# experiment_timestamp = '240222_161150'
-
-dataset_dir = Path('/home/siyuchen/Downloads/data/dataset/rivercloud_dataset/20240213/20240213_113334/')
+dataset_dir = Path('/home/siyuchen/Downloads/data/dataset/rivercloud_dataset/20240213/20240213_112238/')
 slam_method = 'orb3'
-# experiment_timestamp = '240223_092550'
-experiment_timestamp = '240223_092904'
+# experiment_timestamp = '240222_152334'
+# experiment_timestamp = '240222_153021'
+# experiment_timestamp = '240222_154342'
+# experiment_timestamp = '240222_155031'
+experiment_timestamp = '240222_161150'
+use_drone = False
+
+# dataset_dir = Path('/home/siyuchen/Downloads/data/dataset/rivercloud_dataset/20240213/20240213_113334/')
+# slam_method = 'orb3'
+# # experiment_timestamp = '240223_092550'
+# # experiment_timestamp = '240223_092904'
+# # new camera parametes
+# # experiment_timestamp = '240224_154305'
+# # experiment_timestamp = '240224_154949'
+# # experiment_timestamp = '240224_162742'
+# experiment_timestamp = '240224_163054'
 
 # dataset_dir = Path('/home/siyuchen/Downloads/data/dataset/rivercloud_dataset/20240213/20240213_115130/')
 # slam_method = 'orb3'
-# experiment_timestamp = '240223_094643'
+# # experiment_timestamp = '240223_094643'
+# # new camera parametes
+# experiment_timestamp = '240224_160658'
 
 # read start_id used in slam
 start_id = None
@@ -304,54 +334,103 @@ tf_ant1_vehicle = np.zeros((4, 4))
 tf_ant1_vehicle[0:3, 0:3] = rotation_ant1_vehicle.as_matrix()
 tf_ant1_vehicle[0:3, 3] = -rotation_ant1_vehicle.as_matrix() @ tf_vehicle_ant1[0:3, 3]
 
-# not clear, waiting for Christoph Effkemann 21.02.2024
-# from imu to left camera
-imu_cam_left = np.zeros((3, 3))
-imu_cam_left[:, 0] = [0.999258, 0.000897, 0.038500]
-imu_cam_left[:, 1] = [-0.038439, -0.037827, 0.998545]
-imu_cam_left[:, 2] = [0.002352, -0.999284, -0.037765]
+# # values from email 20.11.2023 Christoph Effkemann
+# # not clear, waiting for Christoph Effkemann 21.02.2024
+# # reply on 23.02.2024, stay unchanged
+# # he used imu frame, but the frame is NOT imu body frame, but actually vehicle frame
+# # set by SETINSROTATION command
+# # from "imu" to left camera is confusing
+# imu_cam_left = np.zeros((3, 3))
+# imu_cam_left[:, 0] = [0.999258, 0.000897, 0.038500]
+# imu_cam_left[:, 1] = [-0.038439, -0.037827, 0.998545]
+# imu_cam_left[:, 2] = [0.002352, -0.999284, -0.037765]
+# tf_imu_cam_left = np.zeros((4, 4))
+# tf_imu_cam_left[0:3, 0:3] = imu_cam_left
+# tf_imu_cam_left[0:3, 3] = 1e-3 * np.array([-458.9, 92.6, 170.6])
+# tf_imu_cam_left[3, 3] = 1
+# tf_cam_left_vslam = np.diag([1, -1, -1, 1])
+# tf_ant1_cam_left = tf_ant1_vehicle @ tf_imu_cam_left @ tf_cam_left_vslam
+# # modified on 25.11.2024
+# # actually from vehicle to left camera
 
-tf_imu_cam_left = np.zeros((4, 4))
-tf_imu_cam_left[0:3, 0:3] = imu_cam_left
-tf_imu_cam_left[0:3, 3] = 1e-3 * np.array([-458.9, 92.6, 170.6])
-tf_imu_cam_left[3, 3] = 1
+vehicle_cam_left = np.zeros((3, 3))
+vehicle_cam_left[:, 0] = [0.999258, 0.000897, 0.038500]
+vehicle_cam_left[:, 1] = [-0.038439, -0.037827, 0.998545]
+vehicle_cam_left[:, 2] = [0.002352, -0.999284, -0.037765]
+tf_vehicle_cam_left = np.zeros((4, 4))
+tf_vehicle_cam_left[0:3, 0:3] = vehicle_cam_left
+tf_vehicle_cam_left[0:3, 3] = 1e-3 * np.array([-458.9, 92.6, 170.6])
+tf_vehicle_cam_left[3, 3] = 1
+print("translation from vehicle to camera left:", tf_vehicle_cam_left[0:3, 3])
 
+# # add on 19.12.2024
+tf_camera_left_vehicle = np.zeros((4, 4))
+tf_camera_left_vehicle[0:3, 0:3] = vehicle_cam_left.T
+tf_camera_left_vehicle[0:3, 3] = - vehicle_cam_left.T @ tf_vehicle_cam_left[0:3, 3]
+tf_camera_left_vehicle[3, 3] = 1
+
+print("FOR DEBUGGING: tf_camera_left_vehicle tanslation:", tf_camera_left_vehicle[0:3, 3])
+print("FOR DEBUGGING: tf_camera_left_vehicle rotation:", R.from_matrix(tf_camera_left_vehicle[0:3, 0:3]).as_quat())
+
+print("FOR DEBUGGING: tf_vehicle_ant1 tanslation:", tf_vehicle_ant1[0:3, 3])
+print("FOR DEBUGGING: tf_vehicle_ant1 rotation:", R.from_matrix(tf_vehicle_ant1[0:3, 0:3]).as_quat())
+
+tf_camera_left_ant1 = tf_camera_left_vehicle @ tf_vehicle_ant1
+print(tf_camera_left_vehicle)
+print(tf_vehicle_ant1)
+print("translation from camera left to antenna 1:", tf_camera_left_ant1[0:3, 3])
+
+print(tf_vehicle_cam_left @ tf_camera_left_ant1)
+print("rotation from vehicle to antenna1: ", R.from_matrix(tf_vehicle_ant1[0:3, 0:3]).as_quat())
+print("rotation from vehicle to camera left: ", R.from_matrix(tf_vehicle_cam_left[0:3, 0:3]).as_quat())
+
+# # in Effkemann's definition, x from left to right, y up to the sky, z backwards
+# # see his email on 20.11.2023 15:50
+# # in orb slam, x from left to right, y down to the ground, z forwards
+# # see https://github.com/UZ-SLAMLab/ORB_SLAM3/blob/master/Calibration_Tutorial.pdf
+# # basically, it means rotation x axis 180 degree from Effkemann's definition to orb slam's definition
 tf_cam_left_vslam = np.diag([1, -1, -1, 1])
 
-tf_ant1_cam_left = tf_ant1_vehicle @ tf_imu_cam_left @ tf_cam_left_vslam
+tf_ant1_cam_left = tf_ant1_vehicle @ tf_vehicle_cam_left @ tf_cam_left_vslam
 
 camera_traj_in_ant1 = np.einsum('ij,kjl->kil', tf_ant1_cam_left, camera_traj)
 camera_traj_len = camera_traj_in_ant1.shape[0]
-# print(camera_traj_in_ant1.shape)
+print(camera_traj_in_ant1.shape)
+print(camera_traj_in_ant1[0, :, :])
+
+# # add on 19.12.2024
+for i in range(camera_traj_in_ant1.shape[0]):
+    camera_traj_in_ant1[i, :3, 3] += np.dot(camera_traj_in_ant1[i, :3, :3], tf_camera_left_ant1[0:3, 3])
 
 camera_end_id = ref_id + camera_traj_len - 1
 print(ref_id, camera_end_id)
 camera_end_time = gps_time_to_posix_time(gps_week, camera_timestamp[camera_end_id]['desired_ts'])
-lla_end_id = np.where(np.abs(time_stamp_list - camera_end_time) < desired_tol)
-print(time_stamp_list[-1], camera_end_time)
-assert lla_end_id[0].size == 1
-lla_end_id = lla_end_id[0][0]
+lla_end_id = np.where(time_stamp_list - camera_end_time > 0)[0][0]
 
-time_meas = np.array(time_stamp_list[ref_lla_time_id:lla_end_id+1] - time_stamp_list[ref_lla_time_id])
+time_meas = np.array(time_stamp_list[ref_lla_time_id:lla_end_id] - time_stamp_list[ref_lla_time_id])
 
-# drone_trajectory_path = dataset_dir / f'{dataset_dir.parts[-1]}_Tracking_diff_FloatingCorr.log'
-drone_trajectory_path = dataset_dir / f'{dataset_dir.parts[-1]}_Tracking_ohne_Korrektur.log'
+if use_drone:
+    drone_trajectory_path = dataset_dir / f'{dataset_dir.parts[-1]}_Tracking_diff_FloatingCorr.log'
+    # drone_trajectory_path = dataset_dir / 'Tracking_ohneKorrektur.log'
 
-# Reading the file
-df = pd.read_csv(drone_trajectory_path, delim_whitespace=True)
-drone_image_time_list = df['time'].tolist()
-drone_image_posix_time_list = np.array([gps_time_to_posix_time(gps_week, sec)
-                               for sec in drone_image_time_list])
-drone_start_id = np.where(drone_image_posix_time_list > time_stamp_list[ref_lla_time_id])[0][0]
-drone_end_id = np.where(drone_image_posix_time_list > camera_end_time)[0][0]
-drone_enu = lla2enu(df['Latitude'].values,
-                    df['Longitude'].values,
-                    df['Elevation'].values,
-                    lla_ref[0],
-                    lla_ref[1],
-                    lla_ref[2],
-                    degrees=True)
-print("Drone:", drone_end_id - drone_start_id)
+    # Reading the file
+    df = pd.read_csv(drone_trajectory_path, delim_whitespace=True)
+    drone_image_time_list = df['time'].tolist()
+    drone_image_posix_time_list = np.array([gps_time_to_posix_time(gps_week, sec)
+                                   for sec in drone_image_time_list])
+    drone_start_id = np.where(drone_image_posix_time_list > time_stamp_list[ref_lla_time_id])[0][0]
+    print(drone_image_posix_time_list[-1], camera_end_time)
+    drone_end_id = drone_image_posix_time_list.shape[0]
+    if drone_image_posix_time_list[-1] > camera_end_time:
+        drone_end_id = np.where(drone_image_posix_time_list > camera_end_time)[0][0]
+    drone_enu = lla2enu(df['Latitude'].values,
+                        df['Longitude'].values,
+                        df['Elevation'].values,
+                        lla_ref[0],
+                        lla_ref[1],
+                        lla_ref[2],
+                        degrees=True)
+    print("Drone:", drone_end_id - drone_start_id + 1)
 print("VSLAM:", camera_traj_in_ant1.shape[0])
 print("GNSS:", lla_end_id - ref_lla_time_id)
 
@@ -366,7 +445,8 @@ ax0.plot(enu[0, ref_lla_time_id], enu[1, ref_lla_time_id], '*', label="START")
 ax0.plot(enu[0, lla_end_id], enu[1, lla_end_id], '+', label='END')
 # ax0.plot(enu[0, ref_lla_time_id:lla_end_id + 1], enu[1, ref_lla_time_id:lla_end_id+1], label="GROUND TRUTH")
 ax0.plot(camera_traj_in_ant1[:, 0, 3], camera_traj_in_ant1[:, 1, 3], label="VSLAM")
-ax0.plot(drone_enu[0, drone_start_id:drone_end_id], drone_enu[1, drone_start_id:drone_end_id], label="Drone")
+if use_drone:
+    ax0.plot(drone_enu[0, drone_start_id:drone_end_id], drone_enu[1, drone_start_id:drone_end_id], label="Drone")
 ax0.axis('equal')
 ax0.set_xlabel('East m')
 ax0.set_ylabel('North m')
@@ -399,28 +479,33 @@ ax3.set_ylabel('Standard Deviation m')
 ax3.set_title('Standard Deviation of Latitude, Longitude and Altitude, RTK Measurements')
 ax3.legend()
 
-drone_rel_time = drone_image_posix_time_list - time_stamp_list[ref_lla_time_id]
 ax4 = plt.subplot(gs[2, 0])
 ax4.plot(time_meas,
-         enu[0, ref_lla_time_id:lla_end_id + 1], label='RTK in East')
+         enu[0, ref_lla_time_id:lla_end_id], label='RTK in East')
 ax4.plot(time_meas,
          camera_traj_in_ant1[:, 0, 3], label='VSLAM in East')
-ax4.plot(drone_rel_time[drone_start_id:drone_end_id], drone_enu[0, drone_start_id:drone_end_id], label="Drone in North")
+if use_drone:
+    drone_rel_time = drone_image_posix_time_list - time_stamp_list[ref_lla_time_id]
+    ax4.plot(drone_rel_time[drone_start_id:drone_end_id], drone_enu[0, drone_start_id:drone_end_id], label="Drone in North")
 ax4.set_xlabel('Time s')
 ax4.set_xlim(left=0)
 ax4.set_ylabel('Meter m')
 ax4.legend()
 ax4.set_title('RTK vs. VSLAM in East')
 
+# nb_gnss = lla_end_id - ref_lla_time_id
+# gnss_noise = np.random.normal(loc=0, scale=0.5, size=nb_gnss)
+
 ax5 = plt.subplot(gs[2, 1])
-dif_east = np.array(camera_traj_in_ant1[:, 0, 3]) - np.array(enu[0, ref_lla_time_id:lla_end_id + 1])
-ax5.plot(time_meas, np.abs(dif_east), 'g--', label="difference")
+dif_east = np.array(camera_traj_in_ant1[:, 0, 3]) - np.array(enu[0, ref_lla_time_id:lla_end_id])
+ax5.plot(time_meas, np.abs(dif_east), 'g--', label="difference of slam")
+# ax5.plot(time_meas, np.abs(gnss_noise), 'r--', label="difference of gnss")
 
 ax5.legend()
 
 ax6 = plt.subplot(gs[2, 2])
 ax6.plot(time_meas,
-         enu[1, ref_lla_time_id:lla_end_id + 1], label='RTK in North')
+         enu[1, ref_lla_time_id:lla_end_id], label='RTK in North')
 ax6.plot(time_meas,
          camera_traj_in_ant1[:, 1, 3], label='VSLAM in North')
 ax6.set_xlabel('Time s')
@@ -430,13 +515,13 @@ ax6.legend()
 ax6.set_title('RTK vs. VSLAM in North')
 
 ax7 = plt.subplot(gs[2, 3])
-dif_north = np.array(camera_traj_in_ant1[:, 1, 3]) - np.array(enu[1, ref_lla_time_id:lla_end_id + 1])
+dif_north = np.array(camera_traj_in_ant1[:, 1, 3]) - np.array(enu[1, ref_lla_time_id:lla_end_id])
 ax7.plot(time_meas, np.abs(dif_north), 'g--', label="difference")
 ax7.legend()
 
 ax8 = plt.subplot(gs[2, 4])
 ax8.plot(time_meas,
-         enu[2, ref_lla_time_id:lla_end_id + 1], label='RTK in Up')
+         enu[2, ref_lla_time_id:lla_end_id], label='RTK in Up')
 ax8.plot(time_meas,
          camera_traj_in_ant1[:, 2, 3], label='VSLAM in Up')
 ax8.set_xlabel('Time s')
@@ -446,7 +531,7 @@ ax8.legend()
 ax8.set_title('RTK vs. VSLAM in Up')
 
 ax9 = plt.subplot(gs[2, 5])
-dif_up = np.array(camera_traj_in_ant1[:, 2, 3]) - np.array(enu[2, ref_lla_time_id:lla_end_id + 1])
+dif_up = np.array(camera_traj_in_ant1[:, 2, 3]) - np.array(enu[2, ref_lla_time_id:lla_end_id])
 ax9.plot(time_meas, np.abs(dif_up), 'g--', label="difference")
 ax9.legend()
 
@@ -463,10 +548,59 @@ plt.subplots_adjust(left=0.1,
 
 plt.show()
 
-# # Define the standard deviation profile
-# x = np.linspace(-3, 3, 100)  # Range for the Gaussian function
-# sigma_profile = np.exp(-x**2 / 1)  # Gaussian function for standard deviation
-# print(sigma_profile)
+# RTK
+RTK_column_names = ['time', 'east', 'north', 'up', 'accuracy_latitude', 'accuracy_longitude', 'accuracy_altitude']
+RTK_array = np.column_stack((time_stamp_list[ref_lla_time_id:lla_end_id],
+                                  np.transpose(enu[:, ref_lla_time_id:lla_end_id]),
+                                  lla_list[ref_lla_time_id:lla_end_id, 3:6]))
+# Define the file name
+RTK_file_name = 'RTK.txt'
+
+# print(time_stamp_list[ref_lla_time_id:lla_end_id])
+
+# VSLAM
+VSLAM_column_names = ['time', 'east', 'north', 'up']
+camera_time_list = [gps_time_to_posix_time(gps_week, camera_timestamp[index]['desired_ts'])
+                    for index in range(ref_id, camera_end_id + 1)]
+print(camera_timestamp[ref_id]['desired_ts'], camera_timestamp[camera_end_id]['desired_ts'])
+VSLAM_array = np.column_stack((camera_time_list, camera_traj_in_ant1[:, 0:3, 3]))
+# Define the file name
+VSLAM_file_name = 'VSLAM.txt'
+
+if use_drone:
+    DRONE_column_names = ['time', 'east', 'north', 'up']
+    # Drone
+    DRONE_array = np.column_stack((drone_image_posix_time_list[drone_start_id:drone_end_id],
+                                   np.transpose(drone_enu[0:3, drone_start_id:drone_end_id])))
+    # Define the file name
+    DRONE_file_name = 'DRONE_KORREKTUR.txt'
+
+# Open the file in write mode
+with open(RTK_file_name, 'w') as f:
+    # Write the header
+    f.write(','.join(RTK_column_names) + '\n')
+
+    # Save the array data. `fmt='%s'` is used to accommodate any data type.
+    np.savetxt(f, RTK_array, delimiter=',', fmt='%s')
+
+with open(VSLAM_file_name, 'w') as f:
+    # Write the header
+    f.write(','.join(VSLAM_column_names) + '\n')
+
+    # Save the array data. `fmt='%s'` is used to accommodate any data type.
+    np.savetxt(f, VSLAM_array, delimiter=',', fmt='%s')
+
+with open('README.txt', 'w') as f:
+    # Write the header
+    f.write(f'experiment_id: {experiment_timestamp}\ndataset: {dataset_dir.parts[-1]}')
+
+if use_drone:
+    with open(DRONE_file_name, 'w') as f:
+        # Write the header
+        f.write(','.join(DRONE_column_names) + '\n')
+
+        # Save the array data. `fmt='%s'` is used to accommodate any data type.
+        np.savetxt(f, DRONE_array, delimiter=',', fmt='%s')
 
 # # read configuration file
 # config_name = 'Novatel_20231024_Stereo.txt'
@@ -490,8 +624,6 @@ plt.show()
 # camera_traj = camera_traj.transpose(1, 2, 0)
 # camera_traj = TFa_lc @ camera_traj
 #
-#
-#
 # camera_pose_path = '/home/siyuchen/lib/ORB_SLAM3/Examples/CameraTrajectory.txt'
 # left_camera = np.array([-458.0, 46.3, 497.3])
 # antenna_1 = np.array([-525.6, 5.0, 553.5])
@@ -510,7 +642,7 @@ plt.show()
 # camera_traj = read_camera_path(camera_pose_path)
 # camera_traj = camera_traj.transpose(1, 2, 0)
 # camera_traj = TFa_lc @ camera_traj
-
+# 
 # imu_with_timestamp = np.array(
 #     [[imu_msg.time_stamp, imu_msg.angular_velocity.x,
 #       imu_msg.angular_velocity.y, imu_msg.angular_velocity.z,

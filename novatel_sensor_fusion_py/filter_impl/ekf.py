@@ -249,6 +249,9 @@ class ExtendedKalmanFilter16States:
 
         next_state[0:4] = q_repair
 
+        ## Added on 13.12.2024
+        next_state[10:15] = self.state[10:15]
+
         self.set_state(next_state)
         self.set_state_covariance(self.compute_next_state_covariance(dt))
 

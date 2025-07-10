@@ -35,6 +35,7 @@ tf_imu_cam_right[0:3, 3] = 1e-3 * np.array([451.1, 114.4, 190.4])
 tf_imu_cam_right[3, 3] = 1
 # print("tf imu_cam_right: \n", tf_imu_cam_right)
 
+# See email from Christoph Effkemann on 17.11.2023 13:51
 # from left camera to right camera
 # calculated by multiple camera calibration
 cam_left_cam_right = np.zeros((3, 3))
